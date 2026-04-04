@@ -1,0 +1,22 @@
+{
+  "name": "reelmaps-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-lambda": "^3.1022.0",
+    "@aws-sdk/rds-signer": "^3.1020.0",
+    "@vendia/serverless-express": "^4.12.6",
+    "7zip-bin": "^5.2.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.20.0",
+    "resend": "^6.10.0",
+    "uuid": "^10.0.0"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://coastwatch.pfeg.noaa.gov/erddap/griddap/index.json?page=1&itemsPerPage=20\")"
+    ]
+  }
+}

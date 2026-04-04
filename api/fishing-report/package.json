@@ -1,0 +1,8 @@
+{
+  "name": "fishing-report",
+  "version": "1.0.0",
+  "main": "handler.js",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.500.0"
+  }
+}
