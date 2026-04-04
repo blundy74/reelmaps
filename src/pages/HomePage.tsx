@@ -452,12 +452,8 @@ function PreviewSection() {
               <div className="flex-1 relative overflow-hidden">
                 {/* Multi-layer SST color gradient mimicking real thermal data */}
                 <div className="absolute inset-0">
-                  {/* Base satellite land texture */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#2a1f0e] via-[#1a2a15] to-[#0a1628]" />
                   {/* Ocean SST gradient — warm (orange/yellow) in Gulf, cool (purple/blue) in north */}
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #6b21a8 0%, #1d4ed8 15%, #0891b2 30%, #059669 42%, #84cc16 50%, #eab308 58%, #f97316 65%, #ef4444 75%, #a855f7 90%)' , opacity: 0.7 }} />
-                  {/* Land mask */}
-                  <div className="absolute top-0 left-[5%] w-[55%] h-[85%]" style={{ background: 'linear-gradient(135deg, #1a1a10 0%, #2d2816 20%, #1f2a15 40%, #1a2010 60%, #151510 100%)', clipPath: 'polygon(20% 0%, 35% 0%, 40% 15%, 45% 25%, 50% 20%, 55% 30%, 58% 40%, 55% 50%, 60% 55%, 65% 60%, 70% 65%, 75% 75%, 80% 80%, 85% 85%, 90% 95%, 100% 100%, 70% 100%, 50% 95%, 40% 90%, 30% 85%, 25% 78%, 20% 70%, 18% 60%, 15% 50%, 12% 40%, 10% 30%, 12% 20%, 15% 10%)' }} />
                   {/* Gulf warm pocket */}
                   <div className="absolute bottom-[10%] right-[20%] w-[35%] h-[30%] rounded-full bg-[#f59e0b] opacity-25 blur-xl" />
                   {/* Gulf Stream warm ribbon */}
