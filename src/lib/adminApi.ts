@@ -73,8 +73,8 @@ export async function fetchDashboard(): Promise<AdminDashboardData> {
 
 export interface AdminUser {
   id: string; email: string; display_name: string; email_verified: boolean
-  created_at: string; updated_at: string; spot_count: string; trip_count: string
-  active_sessions: string; last_active: string
+  is_premium: boolean; created_at: string; updated_at: string; spot_count: string
+  trip_count: string; active_sessions: string; last_active: string
 }
 
 export async function fetchAdminUsers(): Promise<AdminUser[]> {

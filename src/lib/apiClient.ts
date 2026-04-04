@@ -59,6 +59,7 @@ export interface AuthUser {
   displayName: string
   avatarUrl?: string
   emailVerified?: boolean
+  isPremium?: boolean
 }
 
 interface AuthResponse {

@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 CREATE INDEX IF NOT EXISTS idx_users_display_name ON users (LOWER(display_name));
 

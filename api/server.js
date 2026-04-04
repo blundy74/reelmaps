@@ -222,7 +222,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id, email: email.toLowerCase(), displayName: chosenName, emailVerified: false },
+      user: { id, email: email.toLowerCase(), displayName: chosenName, emailVerified: false, isPremium: false },
     })
   } catch (err) {
     console.error('Register error:', err)
@@ -236,7 +236,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
 
     const result = await query(
-      'SELECT id, email, password_hash, display_name, avatar_url, email_verified FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, display_name, avatar_url, email_verified, is_premium FROM users WHERE email = $1',
       [email.toLowerCase()]
     )
 
@@ -254,7 +254,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({
       token,
-      user: { id: row.id, email: row.email, displayName: row.display_name, avatarUrl: row.avatar_url, emailVerified: row.email_verified },
+      user: { id: row.id, email: row.email, displayName: row.display_name, avatarUrl: row.avatar_url, emailVerified: row.email_verified, isPremium: row.is_premium ?? false },
     })
   } catch (err) {
     console.error('Login error:', err)
@@ -265,7 +265,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
     const result = await query(
-      'SELECT id, email, display_name, avatar_url, email_verified, created_at FROM users WHERE id = $1',
+      'SELECT id, email, display_name, avatar_url, email_verified, is_premium, created_at FROM users WHERE id = $1',
       [req.user.userId]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' })
@@ -278,7 +278,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
     logActivity(req, req.user.sessionId)
 
     const row = result.rows[0]
-    res.json({ id: row.id, email: row.email, displayName: row.display_name, avatarUrl: row.avatar_url, emailVerified: row.email_verified, createdAt: row.created_at })
+    res.json({ id: row.id, email: row.email, displayName: row.display_name, avatarUrl: row.avatar_url, emailVerified: row.email_verified, isPremium: row.is_premium ?? false, createdAt: row.created_at })
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user' })
   }
@@ -1040,7 +1040,7 @@ app.get('/api/admin/dashboard', authenticateAdmin, async (req, res) => {
 app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
   try {
     const result = await query(`
-      SELECT u.id, u.email, u.display_name, u.email_verified, u.created_at, u.updated_at,
+      SELECT u.id, u.email, u.display_name, u.email_verified, u.is_premium, u.created_at, u.updated_at,
              (SELECT COUNT(*) FROM saved_spots WHERE user_id = u.id) AS spot_count,
              (SELECT COUNT(*) FROM trip_logs WHERE user_id = u.id) AS trip_count,
              (SELECT COUNT(*) FROM sessions WHERE user_id = u.id AND is_active = true) AS active_sessions,
