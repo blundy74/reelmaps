@@ -1,4 +1,4 @@
-# FishCharts — Setup Guide
+# ReelMaps — Setup Guide
 
 ## Prerequisites
 
@@ -28,7 +28,7 @@ npm run preview
 ## Project Structure
 
 ```
-fishcharts/
+reelmaps/
 ├── src/
 │   ├── components/
 │   │   ├── Map/

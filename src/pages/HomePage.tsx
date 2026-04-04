@@ -376,55 +376,32 @@ function PreviewSection() {
           </p>
         </div>
 
-        {/* App preview mockup */}
+        {/* App preview — real screenshot in a browser frame */}
         <div className="relative mx-auto max-w-5xl">
           <div className="rounded-2xl overflow-hidden border border-ocean-600/50 shadow-2xl shadow-black/50">
-            {/* Fake browser chrome */}
+            {/* Browser chrome */}
             <div className="bg-ocean-900 px-4 py-3 flex items-center gap-3 border-b border-ocean-700">
               <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-500/60" />
-                <div className="w-3 h-3 rounded-full bg-amber-500/60" />
-                <div className="w-3 h-3 rounded-full bg-emerald-500/60" />
+                <div className="w-3 h-3 rounded-full bg-red-500/70" />
+                <div className="w-3 h-3 rounded-full bg-amber-500/70" />
+                <div className="w-3 h-3 rounded-full bg-emerald-500/70" />
               </div>
-              <div className="flex-1 bg-ocean-800 rounded-lg px-4 py-1.5 text-xs text-slate-500 font-mono">
-                reelmaps.ai/app
-              </div>
-            </div>
-            {/* Screenshot placeholder — uses a real map screenshot or gradient */}
-            <div className="relative aspect-[16/9] bg-gradient-to-br from-[#040c18] via-[#0a2540] to-[#051525]">
-              {/* Simulated map interface */}
-              <div className="absolute inset-0 flex">
-                {/* Left panel simulation */}
-                <div className="w-64 bg-ocean-900/90 border-r border-ocean-700 p-4 hidden sm:block">
-                  <div className="space-y-3">
-                    <div className="h-8 bg-ocean-800 rounded-lg" />
-                    <div className="space-y-2">
-                      {['Fishing Hotspots (AI)', 'SST Temperature', 'Chlorophyll-a', 'Ocean Currents', 'Weather Radar'].map((label) => (
-                        <div key={label} className="flex items-center gap-2">
-                          <div className="w-8 h-5 rounded bg-cyan-500/20 border border-cyan-500/40" />
-                          <span className="text-xs text-slate-400">{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                {/* Map area with gradient visualization */}
-                <div className="flex-1 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_60%_40%,_#0891b2_0%,_#164e63_25%,_#0c4a6e_40%,_#0a2540_60%,_#051525_100%)] opacity-60" />
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_60%,_#06b6d4_0%,_transparent_30%)] opacity-20" />
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,_#f59e0b_0%,_transparent_20%)] opacity-15" />
-                  {/* Simulated hotspot dots */}
-                  <div className="absolute top-[35%] left-[55%] w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-lg shadow-red-500/50" />
-                  <div className="absolute top-[45%] left-[60%] w-2 h-2 rounded-full bg-orange-500 animate-pulse shadow-lg shadow-orange-500/50" />
-                  <div className="absolute top-[40%] left-[52%] w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse shadow-lg shadow-yellow-500/50" />
-                  {/* ReelMaps watermark */}
-                  <div className="absolute bottom-4 right-4 text-xs text-white/20 font-semibold">ReelMaps</div>
-                </div>
+              <div className="flex-1 bg-ocean-800 rounded-lg px-4 py-1.5 flex items-center gap-2">
+                <svg className="w-3 h-3 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+                <span className="text-xs text-slate-500 font-mono">reelmaps.ai/app</span>
               </div>
             </div>
+            {/* Screenshot image */}
+            <img
+              src="/app-preview.png"
+              alt="ReelMaps application showing SST temperature breaks, AI fishing hotspots, and ocean current data overlaid on an interactive map"
+              className="w-full block"
+              loading="lazy"
+            />
           </div>
-          {/* Glow effect behind */}
-          <div className="absolute -inset-4 bg-cyan-500/5 rounded-3xl blur-3xl -z-10" />
+          {/* Glow effects */}
+          <div className="absolute -inset-6 bg-cyan-500/8 rounded-3xl blur-3xl -z-10" />
+          <div className="absolute -inset-12 bg-blue-500/5 rounded-3xl blur-[60px] -z-20" />
         </div>
       </div>
     </section>
