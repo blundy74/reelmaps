@@ -113,15 +113,15 @@ export default function MapApp() {
                   : 'glass border-ocean-600 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40'
               }`}
             >
-              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                {/* Pin A */}
-                <path d="M5 10c0-1.7 1.3-3 3-3s3 1.3 3 3c0 2.5-3 5-3 5S5 12.5 5 10z" />
-                <circle cx="8" cy="10" r="1" fill="currentColor" stroke="none" />
-                {/* Dotted line connecting pins */}
-                <line x1="10" y1="13" x2="14" y2="9" strokeDasharray="1.5 2" />
-                {/* Pin B */}
-                <path d="M13 7c0-1.7 1.3-3 3-3s3 1.3 3 3c0 2.5-3 5-3 5s-3-2.5-3-5z" />
-                <circle cx="16" cy="7" r="1" fill="currentColor" stroke="none" />
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                {/* Pin A (bottom-left) */}
+                <path d="M6 14c0-2.2 1.8-4 4-4s4 1.8 4 4c0 3-4 6-4 6S6 17 6 14z" />
+                <circle cx="10" cy="14" r="1.5" fill="#040c18" />
+                {/* Pin B (top-right) */}
+                <path d="M14 7c0-2.2 1.8-4 4-4s4 1.8 4 4c0 3-4 6-4 6s-4-3-4-6z" />
+                <circle cx="18" cy="7" r="1.5" fill="#040c18" />
+                {/* Curved dotted path between pins */}
+                <path d="M10 18 C8 16, 12 12, 18 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2.5" strokeLinecap="round" />
               </svg>
               <span className="hidden sm:inline">{measureMode ? 'Measuring...' : 'Measure'}</span>
             </button>
