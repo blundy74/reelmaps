@@ -376,11 +376,11 @@ function PreviewSection() {
           </p>
         </div>
 
-        {/* App preview — real screenshot in a browser frame */}
-        <div className="relative mx-auto max-w-5xl">
+        {/* App preview mockup — faithful recreation of the real UI */}
+        <div className="relative mx-auto max-w-6xl">
           <div className="rounded-2xl overflow-hidden border border-ocean-600/50 shadow-2xl shadow-black/50">
             {/* Browser chrome */}
-            <div className="bg-ocean-900 px-4 py-3 flex items-center gap-3 border-b border-ocean-700">
+            <div className="bg-ocean-900 px-4 py-2.5 flex items-center gap-3 border-b border-ocean-700">
               <div className="flex gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-red-500/70" />
                 <div className="w-3 h-3 rounded-full bg-amber-500/70" />
@@ -391,14 +391,132 @@ function PreviewSection() {
                 <span className="text-xs text-slate-500 font-mono">reelmaps.ai/app</span>
               </div>
             </div>
-            {/* Screenshot image */}
-            <img
-              src="/app-preview.png"
-              alt="ReelMaps application showing SST temperature breaks, AI fishing hotspots, and ocean current data overlaid on an interactive map"
-              className="w-full block"
-              loading="lazy"
-            />
+
+            {/* App UI mockup */}
+            <div className="relative aspect-[16/9] overflow-hidden flex" style={{ background: '#040c18' }}>
+              {/* Left sidebar */}
+              <div className="w-56 lg:w-64 bg-[#0a1628] border-r border-[#1a2d4a] flex-shrink-0 hidden sm:flex flex-col overflow-hidden">
+                {/* Header bar */}
+                <div className="px-3 py-2 border-b border-[#1a2d4a] flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
+                    <svg className="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="currentColor"><ellipse cx="10" cy="12" rx="5" ry="3"/><path d="M15 12l4-3v6z"/></svg>
+                  </div>
+                  <span className="text-xs font-bold text-slate-200">ReelMaps</span>
+                </div>
+                {/* Tabs */}
+                <div className="flex border-b border-[#1a2d4a]">
+                  {['Layers', 'Spots', 'My Spots'].map((t, i) => (
+                    <div key={t} className={`flex-1 py-2 text-center text-[9px] font-medium border-b-2 ${i === 0 ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-600'}`}>{t}</div>
+                  ))}
+                </div>
+                {/* Basemap */}
+                <div className="px-3 pt-3">
+                  <div className="text-[8px] text-slate-600 uppercase tracking-wider mb-1.5">Basemap</div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {[['Dark Ocean', '#0a1628'], ['Satellite', '#2d6a2d'], ['Nautical', '#0a3060'], ['Light', '#d0e8f8']].map(([label, color], i) => (
+                      <div key={label} className={`flex items-center gap-1.5 px-2 py-1 rounded text-[8px] border ${i === 1 ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-300' : 'border-[#1a2d4a] text-slate-500'}`}>
+                        <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: color as string }} />{label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Data layers */}
+                <div className="px-3 pt-3 flex-1">
+                  <div className="text-[8px] text-slate-600 uppercase tracking-wider mb-1.5">Data Layers</div>
+                  <div className="text-[9px] text-cyan-400 font-bold mb-1">FISHING</div>
+                  {['Fishing Hotspots (AI)', 'Inshore Hotspots', 'Offshore Hotspots', 'Sargassum / Weedlines'].map((l) => (
+                    <div key={l} className="flex items-center gap-1.5 py-1">
+                      <div className="w-6 h-3 rounded-full bg-[#1a2d4a]"><div className="w-2 h-2 rounded-full bg-slate-600 mt-0.5 ml-0.5" /></div>
+                      <span className="text-[9px] text-slate-500">{l}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-1.5 py-1">
+                    <div className="w-6 h-3 rounded-full bg-cyan-500"><div className="w-2 h-2 rounded-full bg-white mt-0.5 ml-3" /></div>
+                    <span className="text-[9px] text-slate-200 font-medium">Fishing Spots</span>
+                  </div>
+                  <div className="text-[9px] text-cyan-400 font-bold mt-2 mb-1">SATELLITE &amp; OCEAN COLOR</div>
+                  <div className="flex items-center gap-1.5 py-1">
+                    <div className="w-6 h-3 rounded-full bg-cyan-500"><div className="w-2 h-2 rounded-full bg-white mt-0.5 ml-3" /></div>
+                    <span className="text-[9px] text-slate-200 font-medium">Sea Surface Temp (SST)</span>
+                  </div>
+                  {['SST Anomaly', 'True Color (VIIRS)', 'Chlorophyll-a', 'Chlorophyll 7-Day Avg'].map((l) => (
+                    <div key={l} className="flex items-center gap-1.5 py-1">
+                      <div className="w-6 h-3 rounded-full bg-[#1a2d4a]"><div className="w-2 h-2 rounded-full bg-slate-600 mt-0.5 ml-0.5" /></div>
+                      <span className="text-[9px] text-slate-500">{l}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Map area — colorful SST-like gradient with satellite texture */}
+              <div className="flex-1 relative overflow-hidden">
+                {/* Multi-layer SST color gradient mimicking real thermal data */}
+                <div className="absolute inset-0">
+                  {/* Base satellite land texture */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#2a1f0e] via-[#1a2a15] to-[#0a1628]" />
+                  {/* Ocean SST gradient — warm (orange/yellow) in Gulf, cool (purple/blue) in north */}
+                  <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #6b21a8 0%, #1d4ed8 15%, #0891b2 30%, #059669 42%, #84cc16 50%, #eab308 58%, #f97316 65%, #ef4444 75%, #a855f7 90%)' , opacity: 0.7 }} />
+                  {/* Land mask */}
+                  <div className="absolute top-0 left-[5%] w-[55%] h-[85%]" style={{ background: 'linear-gradient(135deg, #1a1a10 0%, #2d2816 20%, #1f2a15 40%, #1a2010 60%, #151510 100%)', clipPath: 'polygon(20% 0%, 35% 0%, 40% 15%, 45% 25%, 50% 20%, 55% 30%, 58% 40%, 55% 50%, 60% 55%, 65% 60%, 70% 65%, 75% 75%, 80% 80%, 85% 85%, 90% 95%, 100% 100%, 70% 100%, 50% 95%, 40% 90%, 30% 85%, 25% 78%, 20% 70%, 18% 60%, 15% 50%, 12% 40%, 10% 30%, 12% 20%, 15% 10%)' }} />
+                  {/* Gulf warm pocket */}
+                  <div className="absolute bottom-[10%] right-[20%] w-[35%] h-[30%] rounded-full bg-[#f59e0b] opacity-25 blur-xl" />
+                  {/* Gulf Stream warm ribbon */}
+                  <div className="absolute top-[25%] right-[5%] w-[15%] h-[60%] bg-[#ef4444] opacity-20 blur-lg" style={{ transform: 'rotate(-20deg)' }} />
+                  {/* Cool NE water */}
+                  <div className="absolute top-[5%] right-[10%] w-[30%] h-[25%] rounded-full bg-[#7c3aed] opacity-30 blur-xl" />
+                </div>
+
+                {/* Fishing spot dots */}
+                {[
+                  { top: '42%', left: '72%', color: '#f97316', size: 'w-2 h-2' },
+                  { top: '45%', left: '75%', color: '#3b82f6', size: 'w-1.5 h-1.5' },
+                  { top: '48%', left: '71%', color: '#06b6d4', size: 'w-1.5 h-1.5' },
+                  { top: '55%', left: '68%', color: '#f97316', size: 'w-2 h-2' },
+                  { top: '58%', left: '65%', color: '#eab308', size: 'w-1.5 h-1.5' },
+                  { top: '60%', left: '63%', color: '#06b6d4', size: 'w-2 h-2' },
+                  { top: '62%', left: '60%', color: '#ef4444', size: 'w-1.5 h-1.5' },
+                  { top: '65%', left: '62%', color: '#f97316', size: 'w-1.5 h-1.5' },
+                  { top: '70%', left: '58%', color: '#3b82f6', size: 'w-2 h-2' },
+                  { top: '72%', left: '55%', color: '#eab308', size: 'w-1.5 h-1.5' },
+                  { top: '75%', left: '70%', color: '#06b6d4', size: 'w-2 h-2' },
+                  { top: '68%', left: '75%', color: '#ef4444', size: 'w-1.5 h-1.5' },
+                  { top: '50%', left: '78%', color: '#8b5cf6', size: 'w-1.5 h-1.5' },
+                  { top: '35%', left: '80%', color: '#f97316', size: 'w-2 h-2' },
+                  { top: '32%', left: '82%', color: '#3b82f6', size: 'w-1.5 h-1.5' },
+                  { top: '85%', left: '80%', color: '#eab308', size: 'w-2 h-2' },
+                  { top: '88%', left: '78%', color: '#eab308', size: 'w-1.5 h-1.5' },
+                ].map((dot, i) => (
+                  <div key={i} className={`absolute ${dot.size} rounded-full shadow-lg`} style={{ top: dot.top, left: dot.left, backgroundColor: dot.color, boxShadow: `0 0 6px ${dot.color}60` }} />
+                ))}
+
+                {/* Toolbar buttons */}
+                <div className="absolute top-3 right-3 flex flex-col gap-1.5">
+                  {['Share', 'Measure', 'Drop Flag'].map((label) => (
+                    <div key={label} className="bg-[#0a1628]/80 border border-[#1a2d4a] rounded-lg px-2.5 py-1 text-[8px] text-slate-400 backdrop-blur-sm">{label}</div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right weather sidebar */}
+              <div className="w-40 lg:w-48 bg-[#0a1628] border-l border-[#1a2d4a] flex-shrink-0 hidden md:flex flex-col p-2.5">
+                <div className="text-[9px] font-bold text-slate-300 mb-2">Weather</div>
+                <div className="bg-[#0f1d30] border border-[#1a2d4a] rounded-lg px-2 py-1.5 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" strokeLinecap="round"/></svg>
+                    <span className="text-[8px] text-slate-400">Forecast Timeline</span>
+                  </div>
+                </div>
+                <div className="text-[7px] text-slate-600 uppercase tracking-wider mb-1.5">Weather Overlays</div>
+                {['Wind', 'Waves', 'Pressure', 'Rain Radar', 'Clouds'].map((w) => (
+                  <div key={w} className="flex items-center gap-1.5 py-0.5">
+                    <div className="w-5 h-2.5 rounded-full bg-[#1a2d4a]"><div className="w-1.5 h-1.5 rounded-full bg-slate-600 mt-[1px] ml-[2px]" /></div>
+                    <span className="text-[8px] text-slate-500">{w}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+
           {/* Glow effects */}
           <div className="absolute -inset-6 bg-cyan-500/8 rounded-3xl blur-3xl -z-10" />
           <div className="absolute -inset-12 bg-blue-500/5 rounded-3xl blur-[60px] -z-20" />
