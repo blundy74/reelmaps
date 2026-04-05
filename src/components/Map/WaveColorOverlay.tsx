@@ -171,6 +171,7 @@ export default function WaveColorOverlay({ mapRef }: Props) {
     ctx.globalCompositeOperation = 'source-over'
   }, [mapRef, wavesOpacity, forecastHour])
 
+  // Mount/unmount: set up map event listeners (does NOT depend on forecastHour)
   useEffect(() => {
     const map = mapRef.current
     const canvas = canvasRef.current
@@ -183,7 +184,6 @@ export default function WaveColorOverlay({ mapRef }: Props) {
     }
 
     syncSize()
-    // Pre-load land polygons so the first render is fast
     getLandData()
     setTimeout(() => renderOverlay(), 100)
 
@@ -216,7 +216,13 @@ export default function WaveColorOverlay({ mapRef }: Props) {
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
-  }, [mapRef, wavesVisible, wavesOpacity, forecastHour, syncSize, renderOverlay])
+  }, [mapRef, wavesVisible, wavesOpacity, syncSize, renderOverlay])
+
+  // Re-render on forecast hour change without tearing down listeners
+  useEffect(() => {
+    if (!wavesVisible || !mapRef.current) return
+    renderOverlay()
+  }, [forecastHour, wavesVisible, renderOverlay, mapRef])
 
   return (
     <canvas

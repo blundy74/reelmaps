@@ -106,6 +106,32 @@ const LEGENDS: LegendDef[] = [
       { value: 'Extreme', position: '100%' },
     ],
   },
+  {
+    layerId: 'hotspot-inshore',
+    title: 'Inshore Hotspot (<9 NM)',
+    unit: 'probability',
+    isWeatherOverlay: false,
+    gradient: 'linear-gradient(to right, #1e5090, #14a0a0, #80d030, #f0c000, #ff6020, #ff2040, #ff50e0)',
+    labels: [
+      { value: 'Low', position: '0%' },
+      { value: 'Moderate', position: '35%' },
+      { value: 'High', position: '65%' },
+      { value: 'Extreme', position: '100%' },
+    ],
+  },
+  {
+    layerId: 'hotspot-offshore',
+    title: 'Offshore Hotspot (>9 NM)',
+    unit: 'probability',
+    isWeatherOverlay: false,
+    gradient: 'linear-gradient(to right, #1e5090, #14a0a0, #80d030, #f0c000, #ff6020, #ff2040, #ff50e0)',
+    labels: [
+      { value: 'Low', position: '0%' },
+      { value: 'Moderate', position: '35%' },
+      { value: 'High', position: '65%' },
+      { value: 'Extreme', position: '100%' },
+    ],
+  },
   // ── HRRR weather overlays ──────────────────────────────────────────────
   {
     layerId: 'hrrr-wind',

@@ -45,8 +45,8 @@ export default function FishingReport() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`${TILE_BASE}/tiles/hrrr/fishing-reports/latest.json`)
-        if (!res.ok) throw new Error('No report available')
+        const res = await fetch(`${TILE_BASE}/tiles/hrrr/fishing-reports/latest.json`).catch(() => null)
+        if (!res || !res.ok) throw new Error('No report available')
         const data = await res.json()
         setManifest(data)
         if (data.regions?.length) setActiveRegion(data.regions[0])
