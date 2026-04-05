@@ -237,8 +237,13 @@ function UserButton({ user, onLogout }: {
         onClick={() => setShowAccount(true)}
         className="flex items-center gap-1.5 glass rounded-xl px-2.5 py-1.5 hover:bg-ocean-700/80 transition-colors"
       >
-        <div className="w-5 h-5 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center">
+        <div className="relative w-5 h-5 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center">
           <span className="text-[10px] font-bold text-cyan-400">{initials}</span>
+          {user.isPremium && (
+            <svg className="absolute -top-1 -right-1 w-2.5 h-2.5 text-amber-400 drop-shadow sm:hidden" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          )}
         </div>
         <span className="relative text-xs text-slate-300 max-w-24 truncate hidden sm:block">
           {user.displayName || user.email}
@@ -272,7 +277,7 @@ export default function Header({ onSettingsClick }: HeaderProps) {
       {/* Left: logo */}
       <div className="flex items-center gap-3">
         {/* Logo */}
-        <div className="flex items-center gap-2.5">
+        <button onClick={() => window.location.reload()} className="flex items-center gap-2.5 cursor-pointer bg-transparent border-none p-0">
           <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
             <svg className="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" opacity="0.3"/>
@@ -282,11 +287,11 @@ export default function Header({ onSettingsClick }: HeaderProps) {
               <circle cx="8" cy="11.5" r="0.8" fill="#040c18"/>
             </svg>
           </div>
-          <div>
+          <div className="text-left">
             <div className="text-sm font-bold text-slate-100 leading-tight tracking-tight">ReelMaps</div>
             <div className="text-xs text-slate-500 leading-tight hidden sm:block">AI-Powered Fishing Intelligence</div>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Center: Search */}

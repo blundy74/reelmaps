@@ -424,7 +424,7 @@ function PreviewSection() {
                 <div className="px-3 pt-3 flex-1">
                   <div className="text-[8px] text-slate-600 uppercase tracking-wider mb-1.5">Data Layers</div>
                   <div className="text-[9px] text-cyan-400 font-bold mb-1">FISHING</div>
-                  {['Fishing Hotspots (AI)', 'Inshore Hotspots', 'Offshore Hotspots', 'Sargassum / Weedlines'].map((l) => (
+                  {['Fishing Hotspots (AI)', 'Inshore Hotspots (AI)', 'Offshore Hotspots (AI)', 'Sargassum / Weedlines'].map((l) => (
                     <div key={l} className="flex items-center gap-1.5 py-1">
                       <div className="w-6 h-3 rounded-full bg-[#1a2d4a]"><div className="w-2 h-2 rounded-full bg-slate-600 mt-0.5 ml-0.5" /></div>
                       <span className="text-[9px] text-slate-500">{l}</span>

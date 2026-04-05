@@ -86,8 +86,8 @@ export default function Sidebar({ onImportClick }: { onImportClick?: () => void 
           </button>
         </div>
 
-        {/* Satellite date picker — premium only */}
-        {isPremium && <div className="flex items-center gap-2 px-3 py-2 border-b border-ocean-700 flex-shrink-0">
+        {/* Satellite date picker — visible to all, disabled for free users */}
+        <div className={cn('flex items-center gap-2 px-3 py-2 border-b border-ocean-700 flex-shrink-0', !isPremium && 'opacity-50 pointer-events-none')}>
           <svg className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
@@ -132,7 +132,7 @@ export default function Sidebar({ onImportClick }: { onImportClick?: () => void 
               </svg>
             </button>
           </div>
-        </div>}
+        </div>
 
         {/* Tab navigation */}
         <div className="flex border-b border-ocean-700 flex-shrink-0">
@@ -154,28 +154,25 @@ export default function Sidebar({ onImportClick }: { onImportClick?: () => void 
         </div>
 
         {/* Tab content */}
-        <div className="flex-1 overflow-hidden">
-          {isPremium ? (
-            <>
-              {activeTab === 'layers' && <LayerPanel />}
-              {activeTab === 'spots' && <SpotsList />}
-              {activeTab === 'my-spots' && <MySpotsPanel onImportClick={onImportClick} />}
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-4">
-                <svg className="w-7 h-7 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-bold text-slate-200 mb-1">Premium Feature</h3>
-              <p className="text-xs text-slate-500 leading-relaxed mb-4">
-                Satellite layers, fishing spots, spot imports, and the date selector are available to Premium members.
-              </p>
-              <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-ocean-800/80 to-cyan-500/10 p-4 w-full">
-                <div className="text-center">
-                  <p className="text-xs font-bold text-amber-400 mb-1">Upgrade to Premium</p>
-                  <p className="text-[10px] text-slate-500">Unlock all satellite data layers, AI hotspots, fishing spots, and more.</p>
+        <div className="flex-1 overflow-hidden relative">
+          <div className={cn(!isPremium && 'opacity-50 pointer-events-none select-none')}>
+            {activeTab === 'layers' && <LayerPanel />}
+            {activeTab === 'spots' && <SpotsList />}
+            {activeTab === 'my-spots' && <MySpotsPanel onImportClick={onImportClick} />}
+          </div>
+          {!isPremium && (
+            <div className="absolute inset-0 flex items-end justify-center pb-6 pointer-events-none">
+              <div className="pointer-events-auto relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-ocean-900/95 to-cyan-500/10 p-4 mx-4 backdrop-blur-sm shadow-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-amber-400 mb-0.5">Upgrade to Premium</p>
+                    <p className="text-[10px] text-slate-500">Unlock satellite layers, AI hotspots, fishing spots, and more.</p>
+                  </div>
                 </div>
               </div>
             </div>

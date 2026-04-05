@@ -226,8 +226,8 @@ export default function AdminDashboard({ onLogout }: Props) {
         </div>
 
         {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-6">
-          <nav className="flex gap-1">
+        <div className="max-w-7xl mx-auto px-6 overflow-x-auto">
+          <nav className="flex gap-1 min-w-max">
             {TABS.map(t => (
               <button
                 key={t.id}
