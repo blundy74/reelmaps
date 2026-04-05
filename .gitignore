@@ -1,5 +1,7 @@
 node_modules
 dist
+android
+ios
 *.mp4
 *.mov
 *.avi

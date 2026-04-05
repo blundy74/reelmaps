@@ -473,7 +473,14 @@ exports.handler = async (event) => {
   // We reproject the bbox from 3857→4326 before forwarding.
   if (path.includes('/tiles/sargassum/')) {
     const params = event.queryStringParameters || {}
-    const bbox3857 = (params.BBOX || params.bbox || '').split(',').map(Number)
+    // Function URLs may put bbox in rawQueryString; parse it if queryStringParameters is empty
+    let bboxStr = params.BBOX || params.bbox || ''
+    if (!bboxStr && event.rawQueryString) {
+      const m = event.rawQueryString.match(/BBOX=([^&]+)/i)
+      if (m) bboxStr = decodeURIComponent(m[1])
+    }
+    console.log('Sargassum request:', JSON.stringify({ path, bboxStr, params, rawQS: event.rawQueryString }))
+    const bbox3857 = bboxStr.split(',').map(Number)
     if (bbox3857.length !== 4 || bbox3857.some(isNaN)) {
       return { statusCode: 200, headers, body: EMPTY_PNG.toString('base64'), isBase64Encoded: true }
     }
@@ -494,21 +501,24 @@ exports.handler = async (event) => {
     const wmsUrl = `https://cwcgom.aoml.noaa.gov/erddap/wms/noaa_aoml_atlantic_oceanwatch_AFAI_7D/request` +
       `?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&FORMAT=image/png&TRANSPARENT=true` +
       `&LAYERS=noaa_aoml_atlantic_oceanwatch_AFAI_7D:AFAI&SRS=EPSG:4326` +
-      `&WIDTH=256&HEIGHT=256&TIME=last&STYLES=&BBOX=${bbox4326}`
+      `&WIDTH=512&HEIGHT=512&TIME=last&STYLES=&COLORSCALERANGE=-0.01,0.05&BBOX=${bbox4326}`
 
     try {
       const https = require('https')
+      console.log('Sargassum WMS URL:', wmsUrl)
       const imgData = await new Promise((resolve, reject) => {
         https.get(wmsUrl, { timeout: 15000 }, (res) => {
           const chunks = []
           res.on('data', (c) => chunks.push(c))
           res.on('end', () => {
             const buf = Buffer.concat(chunks)
+            console.log(`Sargassum WMS response: status=${res.statusCode}, size=${buf.length}, isPNG=${buf.length > 4 && buf[0] === 0x89}`)
             // Verify it's actually a PNG (starts with \x89PNG)
             if (buf.length > 4 && buf[0] === 0x89 && buf[1] === 0x50) {
               resolve(buf)
             } else {
               // ERDDAP returned an error XML — return empty tile
+              console.log('Sargassum non-PNG response:', buf.toString('utf-8').slice(0, 200))
               resolve(EMPTY_PNG)
             }
           })
