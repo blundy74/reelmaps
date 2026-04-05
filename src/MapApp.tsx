@@ -107,21 +107,18 @@ export default function MapApp() {
                 if (!measureMode) setPinModeActive(false)
               }}
               title={measureMode ? 'Cancel measure' : 'Measure distance'}
-              className={`flex items-center gap-2 px-3 py-2.5 md:py-2 rounded-xl text-xs font-medium transition-all shadow-lg border ${
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-xs font-medium transition-all shadow-lg border ${
                 measureMode
                   ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300 animate-pulse'
                   : 'glass border-ocean-600 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40'
               }`}
             >
-              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                {/* Pin A (bottom-left) */}
-                <path d="M1 17c0-2 1.5-3.5 3.5-3.5S8 15 8 17c0 2.5-3.5 5.5-3.5 5.5S1 19.5 1 17z" />
-                <circle cx="4.5" cy="17" r="1.2" fill="#040c18" />
-                {/* Pin B (top-right) */}
-                <path d="M16 5c0-2 1.5-3.5 3.5-3.5S23 3 23 5c0 2.5-3.5 5.5-3.5 5.5S16 7.5 16 5z" />
-                <circle cx="19.5" cy="5" r="1.2" fill="#040c18" />
-                {/* Curved dotted path between pins */}
-                <path d="M5 21 C3 17, 8 13, 12 12 S17 9, 19.5 9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2.5" strokeLinecap="round" />
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+                <path d="M7 11v3" />
+                <path d="M17 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+                <path d="M17 15v3" />
+                <path d="M7 14l10-2" strokeDasharray="2 2" />
               </svg>
               <span className="hidden sm:inline">{measureMode ? 'Measuring...' : 'Measure'}</span>
             </button>
