@@ -115,13 +115,13 @@ export default function MapApp() {
             >
               <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                 {/* Pin A (bottom-left) */}
-                <path d="M6 14c0-2.2 1.8-4 4-4s4 1.8 4 4c0 3-4 6-4 6S6 17 6 14z" />
-                <circle cx="10" cy="14" r="1.5" fill="#040c18" />
+                <path d="M1 17c0-2 1.5-3.5 3.5-3.5S8 15 8 17c0 2.5-3.5 5.5-3.5 5.5S1 19.5 1 17z" />
+                <circle cx="4.5" cy="17" r="1.2" fill="#040c18" />
                 {/* Pin B (top-right) */}
-                <path d="M14 7c0-2.2 1.8-4 4-4s4 1.8 4 4c0 3-4 6-4 6s-4-3-4-6z" />
-                <circle cx="18" cy="7" r="1.5" fill="#040c18" />
+                <path d="M16 5c0-2 1.5-3.5 3.5-3.5S23 3 23 5c0 2.5-3.5 5.5-3.5 5.5S16 7.5 16 5z" />
+                <circle cx="19.5" cy="5" r="1.2" fill="#040c18" />
                 {/* Curved dotted path between pins */}
-                <path d="M10 18 C8 16, 12 12, 18 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2.5" strokeLinecap="round" />
+                <path d="M5 21 C3 17, 8 13, 12 12 S17 9, 19.5 9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2.5" strokeLinecap="round" />
               </svg>
               <span className="hidden sm:inline">{measureMode ? 'Measuring...' : 'Measure'}</span>
             </button>

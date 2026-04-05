@@ -224,7 +224,7 @@ function AccountModal({ user, onLogout, onClose }: {
 }
 
 function UserButton({ user, onLogout }: {
-  user: { email: string; displayName?: string; avatarUrl?: string; emailVerified?: boolean }
+  user: { email: string; displayName?: string; avatarUrl?: string; emailVerified?: boolean; isPremium?: boolean }
   onLogout: () => void
 }) {
   const [showAccount, setShowAccount] = useState(false)
@@ -240,7 +240,14 @@ function UserButton({ user, onLogout }: {
         <div className="w-5 h-5 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center">
           <span className="text-[10px] font-bold text-cyan-400">{initials}</span>
         </div>
-        <span className="text-xs text-slate-300 max-w-24 truncate hidden sm:block">{user.displayName || user.email}</span>
+        <span className="relative text-xs text-slate-300 max-w-24 truncate hidden sm:block">
+          {user.displayName || user.email}
+          {user.isPremium && (
+            <svg className="absolute -top-1.5 -right-3 w-3 h-3 text-amber-400 drop-shadow" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          )}
+        </span>
       </button>
       {showAccount && createPortal(
         <AccountModal user={user} onLogout={onLogout} onClose={() => setShowAccount(false)} />,

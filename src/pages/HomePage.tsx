@@ -562,7 +562,7 @@ const FAQ_ITEMS = [
       },
       {
         q: 'Is ReelMaps free?',
-        a: 'Yes, you can create a free account and access the full map with all satellite data layers, weather overlays, fishing spots, and AI hotspots. Premium features like unlimited spot imports, trip logging, and priority data are available with a ReelMaps Premium subscription.',
+        a: 'ReelMaps offers a free tier that includes the interactive map, weather overlays (wind, waves, pressure, radar, clouds), and the forecast timeline. Satellite data layers (SST, chlorophyll, ocean currents, altimetry, true color), fishing spots, spot imports, and AI-powered hotspot analysis require a ReelMaps Premium account.',
       },
       {
         q: 'What areas does ReelMaps cover?',
