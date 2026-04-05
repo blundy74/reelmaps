@@ -468,6 +468,37 @@ exports.handler = async (event) => {
     'Cache-Control': 'public, max-age=3600',
   }
 
+  // GET /tiles/depth?lat=XX&lng=XX — proxy ETOPO depth lookup from ERDDAP
+  if (path.includes('/tiles/depth')) {
+    const params = event.queryStringParameters || {}
+    const lat = parseFloat(params.lat)
+    const lng = parseFloat(params.lng)
+    if (isNaN(lat) || isNaN(lng)) {
+      return { statusCode: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'lat and lng required' }) }
+    }
+    try {
+      const https = require('https')
+      const erddapUrl = `https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s.json?z[(${lat.toFixed(4)})][(${lng.toFixed(4)})]`
+      const data = await new Promise((resolve, reject) => {
+        https.get(erddapUrl, { timeout: 8000 }, (res) => {
+          const chunks = []
+          res.on('data', (c) => chunks.push(c))
+          res.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')))
+          res.on('error', reject)
+        }).on('error', reject)
+      })
+      const parsed = JSON.parse(data)
+      const z = parsed?.table?.rows?.[0]?.[2]
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=86400' },
+        body: JSON.stringify({ depth: z ?? null, lat, lng }),
+      }
+    } catch {
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ depth: null }) }
+    }
+  }
+
   // GET /tiles/sargassum/{...} — proxy AOML ERDDAP Sargassum WMS (CORS + reprojection)
   // AOML ERDDAP only supports EPSG:4326, but MapLibre sends EPSG:3857 bbox.
   // We reproject the bbox from 3857→4326 before forwarding.

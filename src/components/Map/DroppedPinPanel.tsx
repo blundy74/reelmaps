@@ -59,16 +59,17 @@ function useActiveWeatherContext() {
   return { windActive, radarActive, sstActive, currentsActive, chlorophyllActive, salinityActive }
 }
 
-/** Fetch ocean depth (meters) from ETOPO 2022 via ERDDAP for a single point. */
+/** Fetch ocean depth (meters) from ETOPO 2022 via ERDDAP for a single point.
+ *  Proxied through the tile Lambda to avoid CORS issues with ERDDAP. */
+const TILE_BASE = import.meta.env.VITE_HRRR_TILE_URL || 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com'
+
 async function fetchDepth(lat: number, lng: number): Promise<number | null> {
   try {
-    const url = `https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s.json?z[(${lat.toFixed(4)})][(${lng.toFixed(4)})]`
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
-    if (!res.ok) return null
+    const url = `${TILE_BASE}/tiles/depth?lat=${lat.toFixed(4)}&lng=${lng.toFixed(4)}`
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) }).catch(() => null)
+    if (!res || !res.ok) return null
     const data = await res.json()
-    const z = data?.table?.rows?.[0]?.[2] // z in meters (negative = ocean depth)
-    if (z == null) return null
-    return z
+    return data?.depth ?? null
   } catch {
     return null
   }
