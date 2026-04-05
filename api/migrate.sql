@@ -18,9 +18,25 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS eula_accepted BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS eula_version VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS eula_accepted_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 CREATE INDEX IF NOT EXISTS idx_users_display_name ON users (LOWER(display_name));
+
+-- ── EULA Versions ──────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS eula_versions (
+  id          SERIAL       PRIMARY KEY,
+  version     VARCHAR(20)  NOT NULL UNIQUE,
+  title       VARCHAR(255) NOT NULL DEFAULT 'End User License Agreement',
+  content     TEXT         NOT NULL,
+  published   BOOLEAN      DEFAULT FALSE,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eula_version ON eula_versions (version);
 
 -- ── Saved Spots ─────────────────────────────────────────────────────────────
 

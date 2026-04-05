@@ -265,7 +265,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
     const result = await query(
-      'SELECT id, email, display_name, avatar_url, email_verified, is_premium, created_at FROM users WHERE id = $1',
+      'SELECT id, email, display_name, avatar_url, email_verified, is_premium, eula_accepted, eula_version, created_at FROM users WHERE id = $1',
       [req.user.userId]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' })
@@ -278,7 +278,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
     logActivity(req, req.user.sessionId)
 
     const row = result.rows[0]
-    res.json({ id: row.id, email: row.email, displayName: row.display_name, avatarUrl: row.avatar_url, emailVerified: row.email_verified, isPremium: row.is_premium ?? false, createdAt: row.created_at })
+    res.json({ id: row.id, email: row.email, displayName: row.display_name, avatarUrl: row.avatar_url, emailVerified: row.email_verified, isPremium: row.is_premium ?? false, eulaAccepted: row.eula_accepted ?? false, eulaVersion: row.eula_version || null, createdAt: row.created_at })
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user' })
   }
@@ -902,6 +902,79 @@ execute(`
   )
 `).catch(err => console.error('Audit table creation failed:', err.message))
 
+// ── Auto-create EULA table on startup ────────────────────────────────────────
+execute(`
+  CREATE TABLE IF NOT EXISTS eula_versions (
+    id          SERIAL       PRIMARY KEY,
+    version     VARCHAR(20)  NOT NULL UNIQUE,
+    title       VARCHAR(255) NOT NULL DEFAULT 'End User License Agreement',
+    content     TEXT         NOT NULL,
+    published   BOOLEAN      DEFAULT FALSE,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )
+`).catch(err => console.error('EULA table creation failed:', err.message))
+
+execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS eula_accepted BOOLEAN DEFAULT FALSE').catch(() => {})
+execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS eula_version VARCHAR(20)').catch(() => {})
+execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS eula_accepted_at TIMESTAMPTZ').catch(() => {})
+
+// ── EULA ────────────────────────────────────────────────────────────────────
+
+// Get the current published EULA
+app.get('/api/eula/current', async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT version, title, content, created_at FROM eula_versions WHERE published = true ORDER BY created_at DESC LIMIT 1'
+    )
+    if (result.rows.length === 0) return res.json({ version: null })
+    const row = result.rows[0]
+    res.json({ version: row.version, title: row.title, content: row.content, createdAt: row.created_at })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch EULA' })
+  }
+})
+
+// Check if user has accepted the current EULA
+app.get('/api/eula/status', authenticateToken, async (req, res) => {
+  try {
+    const [userResult, eulaResult] = await Promise.all([
+      query('SELECT eula_accepted, eula_version, eula_accepted_at FROM users WHERE id = $1', [req.user.userId]),
+      query('SELECT version FROM eula_versions WHERE published = true ORDER BY created_at DESC LIMIT 1'),
+    ])
+    const user = userResult.rows[0]
+    const currentVersion = eulaResult.rows[0]?.version || null
+
+    res.json({
+      accepted: user?.eula_accepted ?? false,
+      acceptedVersion: user?.eula_version || null,
+      acceptedAt: user?.eula_accepted_at || null,
+      currentVersion,
+      needsAcceptance: currentVersion && (!user?.eula_accepted || user?.eula_version !== currentVersion),
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to check EULA status' })
+  }
+})
+
+// Accept the current EULA
+app.post('/api/eula/accept', authenticateToken, async (req, res) => {
+  try {
+    const eulaResult = await query(
+      'SELECT version FROM eula_versions WHERE published = true ORDER BY created_at DESC LIMIT 1'
+    )
+    if (eulaResult.rows.length === 0) return res.status(400).json({ error: 'No EULA published' })
+
+    const version = eulaResult.rows[0].version
+    await execute(
+      'UPDATE users SET eula_accepted = true, eula_version = $1, eula_accepted_at = NOW(), updated_at = NOW() WHERE id = $2',
+      [version, req.user.userId]
+    )
+    res.json({ accepted: true, version })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to accept EULA' })
+  }
+})
+
 // ── Admin Dashboard ─────────────────────────────────────────────────────────
 
 const ADMIN_EMAIL = 'blundywhat@gmail.com'
@@ -1040,7 +1113,7 @@ app.get('/api/admin/dashboard', authenticateAdmin, async (req, res) => {
 app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
   try {
     const result = await query(`
-      SELECT u.id, u.email, u.display_name, u.email_verified, u.is_premium, u.created_at, u.updated_at,
+      SELECT u.id, u.email, u.display_name, u.email_verified, u.is_premium, u.eula_accepted, u.eula_version, u.created_at, u.updated_at,
              (SELECT COUNT(*) FROM saved_spots WHERE user_id = u.id) AS spot_count,
              (SELECT COUNT(*) FROM trip_logs WHERE user_id = u.id) AS trip_count,
              (SELECT COUNT(*) FROM sessions WHERE user_id = u.id AND is_active = true) AS active_sessions,
@@ -1076,6 +1149,53 @@ app.get('/api/admin/errors', authenticateAdmin, async (req, res) => {
     })
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch errors' })
+  }
+})
+
+// Admin: Create or update EULA version
+app.post('/api/admin/eula', authenticateAdmin, async (req, res) => {
+  try {
+    const { version, title, content, published } = req.body
+    if (!version || !content) return res.status(400).json({ error: 'version and content required' })
+
+    // Unpublish all existing versions if publishing this one
+    if (published) {
+      await execute('UPDATE eula_versions SET published = false WHERE published = true')
+    }
+
+    // Upsert
+    const existing = await query('SELECT id FROM eula_versions WHERE version = $1', [version])
+    if (existing.rows.length > 0) {
+      await execute(
+        'UPDATE eula_versions SET title = $1, content = $2, published = $3 WHERE version = $4',
+        [title || 'End User License Agreement', content, published ?? false, version]
+      )
+    } else {
+      await execute(
+        'INSERT INTO eula_versions (version, title, content, published) VALUES ($1, $2, $3, $4)',
+        [version, title || 'End User License Agreement', content, published ?? false]
+      )
+    }
+
+    // If publishing a new version, reset all users' acceptance so they must re-accept
+    if (published) {
+      await execute('UPDATE users SET eula_accepted = false, eula_version = NULL, eula_accepted_at = NULL')
+    }
+
+    res.json({ ok: true, version, published: published ?? false })
+  } catch (err) {
+    console.error('EULA create error:', err)
+    res.status(500).json({ error: 'Failed to save EULA' })
+  }
+})
+
+// Admin: List all EULA versions
+app.get('/api/admin/eula', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await query('SELECT id, version, title, published, created_at, LENGTH(content) AS content_length FROM eula_versions ORDER BY created_at DESC')
+    res.json(result.rows)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch EULA versions' })
   }
 })
 

@@ -60,6 +60,8 @@ export interface AuthUser {
   avatarUrl?: string
   emailVerified?: boolean
   isPremium?: boolean
+  eulaAccepted?: boolean
+  eulaVersion?: string | null
 }
 
 interface AuthResponse {
@@ -122,6 +124,34 @@ export async function resetPassword(email: string, code: string, newPassword: st
 
 export async function deactivateAccount(): Promise<{ deactivated: boolean }> {
   return request('/api/auth/deactivate', { method: 'POST' })
+}
+
+// ── EULA API ────────────────────────────────────────────────────────────────
+
+export interface EulaData {
+  version: string | null
+  title?: string
+  content?: string
+  createdAt?: string
+}
+
+export interface EulaStatus {
+  accepted: boolean
+  acceptedVersion: string | null
+  currentVersion: string | null
+  needsAcceptance: boolean
+}
+
+export async function getCurrentEula(): Promise<EulaData> {
+  return request('/api/eula/current')
+}
+
+export async function getEulaStatus(): Promise<EulaStatus> {
+  return request('/api/eula/status')
+}
+
+export async function acceptEula(): Promise<{ accepted: boolean; version: string }> {
+  return request('/api/eula/accept', { method: 'POST' })
 }
 
 // ── Spots API ───────────────────────────────────────────────────────────────

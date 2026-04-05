@@ -402,6 +402,7 @@ function UsersTab({ users }: { users: AdminUser[] | null }) {
               <th className="pb-2 pr-4">Email</th>
               <th className="pb-2 pr-4 text-center">Verified</th>
               <th className="pb-2 pr-4 text-center">Premium</th>
+              <th className="pb-2 pr-4 text-center">EULA</th>
               <th className="pb-2 pr-4 text-right">Spots</th>
               <th className="pb-2 pr-4 text-right">Trips</th>
               <th className="pb-2 pr-4 text-right">Sessions</th>
@@ -424,6 +425,13 @@ function UsersTab({ users }: { users: AdminUser[] | null }) {
                 <td className="py-2.5 pr-4 text-center">
                   {u.is_premium ? (
                     <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400">PRO</span>
+                  ) : (
+                    <span className="text-slate-600">&#10007;</span>
+                  )}
+                </td>
+                <td className="py-2.5 pr-4 text-center">
+                  {u.eula_accepted ? (
+                    <span className="text-emerald-400 text-[10px]" title={u.eula_version || ''}>v{u.eula_version}</span>
                   ) : (
                     <span className="text-slate-600">&#10007;</span>
                   )}
