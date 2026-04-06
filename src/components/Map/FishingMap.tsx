@@ -528,13 +528,10 @@ export default function FishingMap() {
             map.setLayoutProperty(layerId, 'visibility', 'visible')
             map.setPaintProperty(layerId, 'raster-opacity', layerState.opacity)
 
-            // Update WMS tiles if date-dependent
-            const layerDef = layerId
-            if (WMS_LAYERS.has(layerDef)) {
-              const src = map.getSource(`${layerId}-source`) as maplibregl.RasterTileSource
-              if (src && typeof src.setTiles === 'function') {
-                src.setTiles(tiles)
-              }
+            // Update tile URLs when date changes (WMS and date-dependent XYZ layers)
+            const src = map.getSource(`${layerId}-source`) as maplibregl.RasterTileSource
+            if (src && typeof src.setTiles === 'function') {
+              src.setTiles(tiles)
             }
           }
         }
