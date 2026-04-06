@@ -384,17 +384,20 @@ def compute_species_score(sst_grid):
     return score.astype(np.float32)
 
 
-def fetch_sargassum_grid():
+def fetch_sargassum_grid(target_date=None):
     """Fetch AFAI (Alternative Floating Algae Index) 7-day composite from ERDDAP.
     Returns AFAI values on the output lat/lon grid, or None.
-    Data source: NOAA AOML Atlantic Oceanwatch — covers 0-38N, 98W-38W.
+    target_date: optional YYYYMMDD string.
     """
-    # AOML ERDDAP is on a different server than CoastWatch
     aoml_base = 'https://cwcgom.aoml.noaa.gov/erddap/griddap'
 
-    # Try with (last) first, then fall back to recent days
-    for days_ago in range(1, 5):
-        date = (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime('%Y-%m-%dT12:00:00Z')
+    if target_date:
+        base = datetime.strptime(target_date, '%Y%m%d').replace(tzinfo=timezone.utc)
+    else:
+        base = datetime.now(timezone.utc)
+
+    for days_ago in range(0, 5):
+        date = (base - timedelta(days=days_ago)).strftime('%Y-%m-%dT12:00:00Z')
         url = (
             f'{aoml_base}/noaa_aoml_atlantic_oceanwatch_AFAI_7D.nc?'
             f'AFAI[({date})]'
@@ -416,14 +419,20 @@ def fetch_sargassum_grid():
     return None
 
 
-def fetch_sargassum_daily_grid():
+def fetch_sargassum_daily_grid(target_date=None):
     """Fetch AFAI daily (single-day) from ERDDAP.
     Returns AFAI values on the output lat/lon grid, or None.
+    target_date: optional YYYYMMDD string.
     """
     aoml_base = 'https://cwcgom.aoml.noaa.gov/erddap/griddap'
 
+    if target_date:
+        base = datetime.strptime(target_date, '%Y%m%d').replace(tzinfo=timezone.utc)
+    else:
+        base = datetime.now(timezone.utc)
+
     for days_ago in range(0, 3):
-        date = (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime('%Y-%m-%dT12:00:00Z')
+        date = (base - timedelta(days=days_ago)).strftime('%Y-%m-%dT12:00:00Z')
         url = (
             f'{aoml_base}/noaa_aoml_atlantic_oceanwatch_AFAI_1D.nc?'
             f'AFAI[({date})]'
@@ -963,7 +972,7 @@ def handler(event, context):
         # ── Sargassum / Weedline grid ──────────────────────────────────────
         logger.info('=== Computing Sargassum / Weedline grid ===')
         try:
-            sargassum_grid = fetch_sargassum_grid()
+            sargassum_grid = fetch_sargassum_grid(target_date=date_str)
             if sargassum_grid is not None:
                 valid = ~np.isnan(sargassum_grid)
                 nonzero = np.count_nonzero(valid)
@@ -1000,7 +1009,7 @@ def handler(event, context):
         # ── Sargassum daily (single-day) grid ──────────────────────────────
         logger.info('=== Computing Sargassum Daily grid ===')
         try:
-            sarg_daily = fetch_sargassum_daily_grid()
+            sarg_daily = fetch_sargassum_daily_grid(target_date=date_str)
             if sarg_daily is not None:
                 valid = ~np.isnan(sarg_daily)
                 afai_d_valid = sarg_daily[valid]
