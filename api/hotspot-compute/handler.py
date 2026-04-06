@@ -818,6 +818,17 @@ def handler(event, context):
             inshore_mask = (coast_dist > 0) & (coast_dist <= INSHORE_LIMIT_NM)
             inshore = np.where(inshore_mask, composite, 0).astype(np.float32)
 
+            # Re-normalize inshore independently — the narrow coastal band has
+            # inflated scores from land-ocean gradients. Apply percentile normalization
+            # and a sqrt (gamma) curve to spread values and reduce the "everything is extreme" effect.
+            inshore_valid = inshore[inshore > 0.01]
+            if len(inshore_valid) > 100:
+                p95 = np.percentile(inshore_valid, 95)
+                inshore_renorm = np.where(inshore > 0.01, np.clip(inshore / max(p95, 0.01), 0, 1), 0)
+                # Sqrt gamma: compresses high values, expands low values
+                inshore = np.where(inshore_renorm > 0, np.sqrt(inshore_renorm), 0).astype(np.float32)
+                logger.info(f'Inshore re-normalized: p95={p95:.3f}, new mean={inshore[inshore > 0].mean():.3f}')
+
             # Offshore: beyond 9 NM from coastline
             offshore_mask = coast_dist > INSHORE_LIMIT_NM
             offshore = np.where(offshore_mask, composite, 0).astype(np.float32)
