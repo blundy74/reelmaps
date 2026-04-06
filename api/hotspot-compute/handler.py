@@ -416,6 +416,35 @@ def fetch_sargassum_grid():
     return None
 
 
+def fetch_sargassum_daily_grid():
+    """Fetch AFAI daily (single-day) from ERDDAP.
+    Returns AFAI values on the output lat/lon grid, or None.
+    """
+    aoml_base = 'https://cwcgom.aoml.noaa.gov/erddap/griddap'
+
+    for days_ago in range(0, 3):
+        date = (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime('%Y-%m-%dT12:00:00Z')
+        url = (
+            f'{aoml_base}/noaa_aoml_atlantic_oceanwatch_AFAI_1D.nc?'
+            f'AFAI[({date})]'
+            f'[({max(OUT_LAT_MIN, 0)}):({min(OUT_LAT_MAX, 38)})]'
+            f'[({max(OUT_LNG_MIN, -98)}):({min(OUT_LNG_MAX, -38)})]'
+        )
+        try:
+            logger.info(f'Fetching daily sargassum AFAI for {date}...')
+            r = requests.get(url, timeout=180)
+            if r.status_code == 200:
+                grid = _parse_netcdf(r.content, 'AFAI', date)
+                if grid is not None:
+                    logger.info(f'Daily sargassum AFAI fetched: {np.count_nonzero(~np.isnan(grid))} valid pixels')
+                    return grid
+            logger.warning(f'Daily sargassum AFAI fetch failed ({r.status_code}) for {date}')
+        except Exception as e:
+            logger.warning(f'Daily sargassum AFAI fetch error for {date}: {e}')
+
+    return None
+
+
 def compute_coastline_distance():
     """Compute distance-from-coastline grid in nautical miles.
     Uses bathymetry: land = positive, ocean = negative.
@@ -924,11 +953,33 @@ def handler(event, context):
                 sarg_key = f'grids/sargassum/{date_str}/latest.bin.gz'
                 _upload_grid(sarg_quantized, sarg_key)
                 _upload_grid(sarg_quantized, f'grids/sargassum/{date_str}/daily.bin.gz')
-                logger.info(f'Sargassum grid uploaded: {np.count_nonzero(sarg_quantized)} nonzero pixels')
+                logger.info(f'Sargassum 7-day grid uploaded: {np.count_nonzero(sarg_quantized)} nonzero pixels')
             else:
-                logger.warning('Sargassum data unavailable')
+                logger.warning('Sargassum 7-day data unavailable')
         except Exception as e:
-            logger.warning(f'Sargassum compute failed: {e}')
+            logger.warning(f'Sargassum 7-day compute failed: {e}')
+
+        # ── Sargassum daily (single-day) grid ──────────────────────────────
+        logger.info('=== Computing Sargassum Daily grid ===')
+        try:
+            sarg_daily = fetch_sargassum_daily_grid()
+            if sarg_daily is not None:
+                valid = ~np.isnan(sarg_daily)
+                sarg_d_norm = np.zeros_like(sarg_daily, dtype=np.float32)
+                sarg_d_norm[valid] = np.clip((sarg_daily[valid] + 0.002) / 0.012, 0, 1)
+                sarg_d_norm = gaussian_filter(sarg_d_norm, sigma=0.5)
+
+                sarg_d_q = np.zeros_like(sarg_d_norm, dtype=np.uint8)
+                sarg_d_valid = sarg_d_norm > 0.01
+                sarg_d_q[sarg_d_valid] = np.clip(sarg_d_norm[sarg_d_valid] * 255, 1, 255).astype(np.uint8)
+
+                _upload_grid(sarg_d_q, f'grids/sargassum-daily/{date_str}/latest.bin.gz')
+                _upload_grid(sarg_d_q, f'grids/sargassum-daily/{date_str}/daily.bin.gz')
+                logger.info(f'Sargassum daily grid uploaded: {np.count_nonzero(sarg_d_q)} nonzero pixels')
+            else:
+                logger.warning('Sargassum daily data unavailable')
+        except Exception as e:
+            logger.warning(f'Sargassum daily compute failed: {e}')
 
         return {'statusCode': 200, 'body': json.dumps(manifest)}
 

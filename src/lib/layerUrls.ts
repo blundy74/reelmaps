@@ -169,12 +169,18 @@ export function altimetryUrl(_date: string): string {
 // Sargassum / Weedline Detection (NOAA AOML / USF AFAI)
 // ---------------------------------------------------------------------------
 
-/** Sargassum AFAI 7-day composite — pre-rendered tiles from S3.
- *  Covers Gulf of Mexico, Caribbean, and tropical Atlantic (0-38N, 98W-38W). */
+/** Sargassum AFAI 7-day composite — pre-rendered tiles from S3. */
 export function sargassumUrl(date: string): string {
   const TILE_BASE = import.meta.env.VITE_HRRR_TILE_URL || 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com'
   const dateKey = date.replace(/-/g, '')
   return `${TILE_BASE}/tiles/sargassum/${dateKey}/{z}/{x}/{y}.png`
+}
+
+/** Sargassum AFAI daily (single-day) — pre-rendered tiles from S3. */
+export function sargassumDailyUrl(date: string): string {
+  const TILE_BASE = import.meta.env.VITE_HRRR_TILE_URL || 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com'
+  const dateKey = date.replace(/-/g, '')
+  return `${TILE_BASE}/tiles/sargassum-daily/${dateKey}/{z}/{x}/{y}.png`
 }
 
 // ---------------------------------------------------------------------------
@@ -487,8 +493,16 @@ export const LAYER_REGISTRY: LayerDef[] = [
   },
   {
     id: 'sargassum',
-    name: 'Sargassum / Weedlines (7-day)',
-    description: 'Satellite-detected floating Sargassum seaweed from NOAA AFAI (Alternative Floating Algae Index). 7-day composite at ~1.5km resolution. Weedlines concentrate mahi-mahi, wahoo, tuna, and billfish along their edges. Gulf of Mexico, Caribbean, and tropical Atlantic.',
+    name: 'Weedlines (7-day)',
+    description: '7-day composite of satellite-detected Sargassum from NOAA AFAI. Fills cloud gaps by merging the last 7 days. Best for overall coverage. Atlantic only (Gulf, Caribbean, tropical Atlantic).',
+    group: 'fishing',
+    sourceType: 'raster-xyz',
+    dateDependent: true,
+  },
+  {
+    id: 'sargassum-daily',
+    name: 'Weedlines (Daily)',
+    description: 'Single-day Sargassum detection from NOAA AFAI. Shows today\'s satellite pass only — more cloud gaps but most current positions. Atlantic only.',
     group: 'fishing',
     sourceType: 'raster-xyz',
     dateDependent: true,
@@ -530,6 +544,8 @@ export function buildTileUrl(layerId: string, date: string): string[] {
       return [altimetryUrl(date)]
     case 'sargassum':
       return [sargassumUrl(date)]
+    case 'sargassum-daily':
+      return [sargassumDailyUrl(date)]
     case 'current-arrows':
       return [] // rendered via canvas overlay, not raster tiles
     case 'sst-goes':

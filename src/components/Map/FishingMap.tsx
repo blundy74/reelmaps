@@ -49,6 +49,7 @@ const LAYER_ORDER = [
   'altimetry',
   'current-arrows',
   'sargassum',
+  'sargassum-daily',
   'openseamap',
   'fishing-spots',
 ]
@@ -72,6 +73,7 @@ const RASTER_LAYERS = new Set([
   'ssh-anomaly',
   'altimetry',
   'sargassum',
+  'sargassum-daily',
 ])
 
 // Layers whose tile URLs are WMS (contain bbox placeholder)
@@ -123,7 +125,7 @@ export default function FishingMap() {
   const HI_RES_TILES = new Set(['ssh-anomaly', 'altimetry', 'currents'])
 
   // Low-resolution oceanographic layers that benefit from bilinear smoothing
-  const SMOOTH_LAYERS = new Set(['ssh-anomaly', 'currents', 'salinity', 'sargassum'])
+  const SMOOTH_LAYERS = new Set(['ssh-anomaly', 'currents', 'salinity', 'sargassum', 'sargassum-daily'])
 
   // Source zoom overrides for specific layers
   const SOURCE_ZOOM_OVERRIDES: Record<string, { minzoom?: number; maxzoom?: number }> = {}

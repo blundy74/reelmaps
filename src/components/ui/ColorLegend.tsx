@@ -135,7 +135,20 @@ const LEGENDS: LegendDef[] = [
   // ── Sargassum / Weedline overlay ────────────────────────────────────────
   {
     layerId: 'sargassum',
-    title: 'Sargassum / Weedlines (7-day)',
+    title: 'Weedlines (7-day)',
+    unit: 'AFAI',
+    isWeatherOverlay: false,
+    gradient: 'linear-gradient(to right, rgba(0,0,0,0) 0%, #264653 15%, #2a9d8f 35%, #e9c46a 60%, #f4a261 80%, #e76f51 100%)',
+    labels: [
+      { value: 'None', position: '0%' },
+      { value: 'Low', position: '30%' },
+      { value: 'Moderate', position: '60%' },
+      { value: 'Dense', position: '100%' },
+    ],
+  },
+  {
+    layerId: 'sargassum-daily',
+    title: 'Weedlines (Daily)',
     unit: 'AFAI',
     isWeatherOverlay: false,
     gradient: 'linear-gradient(to right, rgba(0,0,0,0) 0%, #264653 15%, #2a9d8f 35%, #e9c46a 60%, #f4a261 80%, #e76f51 100%)',

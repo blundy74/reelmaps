@@ -658,10 +658,11 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: pngBuffer.toString('base64'), isBase64Encoded: true }
   }
 
-  // GET /tiles/sargassum/{date}/{z}/{x}/{y}.png — sargassum weedline tiles
-  const matchSargassum = path.match(/\/tiles\/sargassum\/(\d{8})\/(\d+)\/(\d+)\/(\d+)\.png/)
+  // GET /tiles/sargassum/{date}/{z}/{x}/{y}.png — sargassum 7-day tiles
+  // GET /tiles/sargassum-daily/{date}/{z}/{x}/{y}.png — sargassum daily tiles
+  const matchSargassum = path.match(/\/tiles\/(sargassum(?:-daily)?)\/(\d{8})\/(\d+)\/(\d+)\/(\d+)\.png/)
   if (matchSargassum) {
-    const [, sDate, sZ, sX, sY] = matchSargassum
+    const [, sVariant, sDate, sZ, sX, sY] = matchSargassum
     const z = parseInt(sZ, 10), x = parseInt(sX, 10), y = parseInt(sY, 10)
     if (z < 3 || z > 10) {
       return { statusCode: 200, headers, body: EMPTY_PNG.toString('base64'), isBase64Encoded: true }
@@ -670,7 +671,7 @@ exports.handler = async (event) => {
     if (bbox.latMax < 0 || bbox.latMin > 38 || bbox.lngMax < -98 || bbox.lngMin > -38) {
       return { statusCode: 200, headers, body: EMPTY_PNG.toString('base64'), isBase64Encoded: true }
     }
-    const grid = await loadHotspotGrid(sDate, 'sargassum')
+    const grid = await loadHotspotGrid(sDate, sVariant)
     if (!grid) {
       return { statusCode: 200, headers, body: EMPTY_PNG.toString('base64'), isBase64Encoded: true }
     }
