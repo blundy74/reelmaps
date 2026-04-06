@@ -498,6 +498,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
     group: 'fishing',
     sourceType: 'raster-xyz',
     dateDependent: true,
+    attribution: 'NOAA AOML / USF Optical Oceanography Lab',
   },
   {
     id: 'sargassum-daily',
@@ -506,7 +507,6 @@ export const LAYER_REGISTRY: LayerDef[] = [
     group: 'fishing',
     sourceType: 'raster-xyz',
     dateDependent: true,
-    attribution: 'NOAA AOML / USF Optical Oceanography Lab',
     attribution: 'NOAA AOML / USF Optical Oceanography Lab',
   },
   {
