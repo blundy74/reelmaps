@@ -487,7 +487,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
   },
   {
     id: 'sargassum',
-    name: 'Sargassum / Weedlines',
+    name: 'Sargassum / Weedlines (7-day Avg)',
     description: 'Satellite-detected floating Sargassum seaweed from NOAA AFAI (Alternative Floating Algae Index). 7-day composite at ~1.5km resolution. Weedlines concentrate mahi-mahi, wahoo, tuna, and billfish along their edges. Gulf of Mexico, Caribbean, and tropical Atlantic.',
     group: 'fishing',
     sourceType: 'raster-wms',
