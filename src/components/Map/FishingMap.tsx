@@ -48,8 +48,6 @@ const LAYER_ORDER = [
   'ssh-anomaly',
   'altimetry',
   'current-arrows',
-  'sargassum',
-  'sargassum-daily',
   'openseamap',
   'fishing-spots',
 ]
@@ -72,8 +70,6 @@ const RASTER_LAYERS = new Set([
   'currents',
   'ssh-anomaly',
   'altimetry',
-  'sargassum',
-  'sargassum-daily',
 ])
 
 // Layers whose tile URLs are WMS (contain bbox placeholder)
@@ -125,7 +121,7 @@ export default function FishingMap() {
   const HI_RES_TILES = new Set(['ssh-anomaly', 'altimetry', 'currents'])
 
   // Low-resolution oceanographic layers that benefit from bilinear smoothing
-  const SMOOTH_LAYERS = new Set(['ssh-anomaly', 'currents', 'salinity', 'sargassum', 'sargassum-daily'])
+  const SMOOTH_LAYERS = new Set(['ssh-anomaly', 'currents', 'salinity'])
 
   // Source zoom overrides for specific layers
   const SOURCE_ZOOM_OVERRIDES: Record<string, { minzoom?: number; maxzoom?: number }> = {}
@@ -1108,6 +1104,8 @@ export default function FishingMap() {
       <HotspotOverlay mapRef={mapRef} />
       <HotspotOverlay mapRef={mapRef} variant="hotspot-inshore" />
       <HotspotOverlay mapRef={mapRef} variant="hotspot-offshore" />
+      <HotspotOverlay mapRef={mapRef} variant="sargassum" />
+      <HotspotOverlay mapRef={mapRef} variant="sargassum-daily" />
       <LightningOverlay mapRef={mapRef} />
       <CurrentArrowOverlay
         mapRef={mapRef}

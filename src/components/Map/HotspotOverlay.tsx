@@ -11,8 +11,8 @@ const TILE_BASE = import.meta.env.VITE_HRRR_TILE_URL || 'https://xhac6pdww5.exec
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
-  /** Which hotspot variant to display: 'hotspot', 'hotspot-inshore', or 'hotspot-offshore' */
-  variant?: 'hotspot' | 'hotspot-inshore' | 'hotspot-offshore'
+  /** Which variant to display */
+  variant?: 'hotspot' | 'hotspot-inshore' | 'hotspot-offshore' | 'sargassum' | 'sargassum-daily'
 }
 
 function toDateKey(isoDate: string): string {
