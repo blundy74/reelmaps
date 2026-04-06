@@ -520,6 +520,44 @@ exports.handler = async (event) => {
     'Cache-Control': 'public, max-age=3600',
   }
 
+  // GET /health/latest — proxy health check results from S3
+  if (path === '/health/latest' || path === '/health/latest.json') {
+    try {
+      const resp = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: 'health/latest.json' }))
+      const body = await resp.Body.transformToString()
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-cache' },
+        body,
+      }
+    } catch {
+      return { statusCode: 404, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: '{"error":"No health data"}' }
+    }
+  }
+
+  // GET /health/history — list last 7 days of health check results
+  if (path === '/health/history') {
+    const { ListObjectsV2Command } = require('@aws-sdk/client-s3')
+    try {
+      const listResp = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: 'health/history/', MaxKeys: 200 }))
+      const keys = (listResp.Contents || []).map(o => o.Key).filter(k => k.endsWith('.json')).sort().reverse().slice(0, 28)
+      const results = []
+      for (const key of keys.slice(0, 14)) { // limit to 14 most recent to keep response small
+        try {
+          const obj = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }))
+          results.push(JSON.parse(await obj.Body.transformToString()))
+        } catch { /* skip */ }
+      }
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=300' },
+        body: JSON.stringify(results),
+      }
+    } catch (e) {
+      return { statusCode: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: e.message }) }
+    }
+  }
+
   // GET /tiles/depth?lat=XX&lng=XX — proxy ETOPO depth lookup from ERDDAP
   if (path.includes('/tiles/depth')) {
     const params = event.queryStringParameters || {}

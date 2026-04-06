@@ -97,3 +97,30 @@ export interface AdminErrors {
 export async function fetchAdminErrors(): Promise<AdminErrors> {
   return adminRequest('/api/admin/errors')
 }
+
+// ── Health Check API ────────────────────────────────────────────────────────
+
+const TILE_BASE = import.meta.env.VITE_HRRR_TILE_URL || 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com'
+
+export interface HealthCheckResult {
+  timestamp: string
+  overall: 'pass' | 'warn' | 'fail'
+  summary: { total: number; passed: number; warned: number; failed: number }
+  tests: { name: string; status: string; responseTime: number; details: string }[]
+}
+
+export async function fetchHealthLatest(): Promise<HealthCheckResult | null> {
+  try {
+    const res = await fetch(`${TILE_BASE}/health/latest`)
+    if (!res.ok) return null
+    return res.json()
+  } catch { return null }
+}
+
+export async function fetchHealthHistory(): Promise<HealthCheckResult[]> {
+  try {
+    const res = await fetch(`${TILE_BASE}/health/history`)
+    if (!res.ok) return []
+    return res.json()
+  } catch { return [] }
+}

@@ -3,7 +3,8 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell,
 } from 'recharts'
 import { fetchDashboard, fetchAdminUsers, fetchAdminErrors, adminLogout } from '../../lib/adminApi'
-import type { AdminDashboardData, AdminUser, AdminErrors } from '../../lib/adminApi'
+import type { AdminDashboardData, AdminUser, AdminErrors, HealthCheckResult } from '../../lib/adminApi'
+import { fetchHealthLatest, fetchHealthHistory } from '../../lib/adminApi'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,7 +106,7 @@ function ChartTooltip({ active, payload, label, formatter }: any) {
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 
-type TabId = 'overview' | 'users' | 'activity' | 'security' | 'system'
+type TabId = 'overview' | 'users' | 'activity' | 'security' | 'system' | 'health'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -113,6 +114,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'activity', label: 'Activity' },
   { id: 'security', label: 'Security' },
   { id: 'system', label: 'System' },
+  { id: 'health', label: 'Health' },
 ]
 
 // ── Main Dashboard ───────────────────────────────────────────────────────────
@@ -253,6 +255,7 @@ export default function AdminDashboard({ onLogout }: Props) {
         {tab === 'activity' && <ActivityTab data={data} />}
         {tab === 'security' && <SecurityTab data={data} />}
         {tab === 'system' && <SystemTab data={data} errors={errors} />}
+        {tab === 'health' && <HealthTab />}
       </div>
       </main>
     </div>
@@ -655,6 +658,124 @@ function SystemTab({ data, errors }: { data: AdminDashboardData; errors: AdminEr
               </div>
             ))}
           </div>
+        </Section>
+      )}
+    </>
+  )
+}
+
+// ── Health Tab ────────────────────────────────────────────────────────────────
+
+const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  pass: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', label: 'PASS' },
+  warn: { bg: 'bg-amber-500/10', text: 'text-amber-400', label: 'WARN' },
+  fail: { bg: 'bg-red-500/10', text: 'text-red-400', label: 'FAIL' },
+}
+
+function HealthTab() {
+  const [latest, setLatest] = useState<HealthCheckResult | null>(null)
+  const [history, setHistory] = useState<HealthCheckResult[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([fetchHealthLatest(), fetchHealthHistory()])
+      .then(([l, h]) => { setLatest(l); setHistory(h) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-6 h-6 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto" />
+        <p className="text-xs text-slate-500 mt-3">Loading health data...</p>
+      </div>
+    )
+  }
+
+  if (!latest) {
+    return (
+      <Section title="Health Checks">
+        <div className="text-center py-8">
+          <p className="text-sm text-slate-500">No health check data available yet.</p>
+          <p className="text-xs text-slate-600 mt-1">Health checks run every 6 hours automatically.</p>
+        </div>
+      </Section>
+    )
+  }
+
+  const overallStyle = STATUS_STYLES[latest.overall] || STATUS_STYLES.fail
+
+  return (
+    <>
+      {/* Overall status banner */}
+      <div className={`${overallStyle.bg} border ${latest.overall === 'pass' ? 'border-emerald-500/30' : latest.overall === 'warn' ? 'border-amber-500/30' : 'border-red-500/30'} rounded-xl p-5`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`w-14 h-14 rounded-xl ${overallStyle.bg} flex items-center justify-center`}>
+              <span className={`text-2xl font-bold ${overallStyle.text}`}>
+                {latest.overall === 'pass' ? '\u2713' : latest.overall === 'warn' ? '!' : '\u2717'}
+              </span>
+            </div>
+            <div>
+              <p className={`text-lg font-bold ${overallStyle.text}`}>System {overallStyle.label}</p>
+              <p className="text-xs text-slate-500">
+                Last checked: {fmtDateTime(latest.timestamp)}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-6 text-center">
+            <div>
+              <p className="text-xl font-bold text-emerald-400">{latest.summary.passed}</p>
+              <p className="text-[10px] text-slate-500 uppercase">Passed</p>
+            </div>
+            <div>
+              <p className="text-xl font-bold text-amber-400">{latest.summary.warned}</p>
+              <p className="text-[10px] text-slate-500 uppercase">Warned</p>
+            </div>
+            <div>
+              <p className="text-xl font-bold text-red-400">{latest.summary.failed}</p>
+              <p className="text-[10px] text-slate-500 uppercase">Failed</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Test results */}
+      <Section title={`Test Results (${latest.summary.total} checks)`}>
+        <div className="space-y-1">
+          {latest.tests.map((t, i) => {
+            const s = STATUS_STYLES[t.status] || STATUS_STYLES.fail
+            return (
+              <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg ${s.bg}`}>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.status === 'pass' ? 'bg-emerald-400' : t.status === 'warn' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                <span className="text-xs text-slate-300 flex-1 min-w-0 truncate">{t.name}</span>
+                <span className="text-[10px] text-slate-500 font-mono flex-shrink-0">{t.responseTime}ms</span>
+                <span className={`text-[10px] ${s.text} font-mono flex-shrink-0 w-8 text-right`}>{s.label}</span>
+              </div>
+            )
+          })}
+        </div>
+      </Section>
+
+      {/* History trend */}
+      {history.length > 1 && (
+        <Section title="Health History">
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={history.slice().reverse().map(h => ({
+              time: fmtDate(h.timestamp) + ' ' + fmtHour(h.timestamp),
+              passed: h.summary.passed,
+              warned: h.summary.warned,
+              failed: h.summary.failed,
+            }))}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#122540" />
+              <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 9 }} angle={-30} textAnchor="end" height={50} />
+              <YAxis tick={{ fill: '#64748b', fontSize: 10 }} />
+              <Tooltip content={<ChartTooltip />} />
+              <Bar dataKey="passed" stackId="a" fill="#10b981" />
+              <Bar dataKey="warned" stackId="a" fill="#f59e0b" />
+              <Bar dataKey="failed" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </Section>
       )}
     </>
