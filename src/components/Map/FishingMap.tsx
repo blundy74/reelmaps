@@ -121,13 +121,13 @@ export default function FishingMap() {
   )
 
   // Layers that use 512px tiles for higher visual quality
-  const HI_RES_TILES = new Set(['ssh-anomaly', 'altimetry', 'currents', 'sargassum'])
+  const HI_RES_TILES = new Set(['ssh-anomaly', 'altimetry', 'currents'])
 
   // Low-resolution oceanographic layers that benefit from bilinear smoothing
   const SMOOTH_LAYERS = new Set(['ssh-anomaly', 'currents', 'salinity', 'sargassum'])
 
-  // Layers with low source resolution that should stop requesting new tiles at a certain zoom
-  const LOW_RES_MAXZOOM: Record<string, number> = { 'sargassum': 7 }
+  // Layers with low source resolution — maxzoom limits tile requests beyond this zoom
+  const LOW_RES_MAXZOOM: Record<string, number> = {}
 
   // ── Add a raster source + layer to the map ───────────────────────────────
   const addRasterLayer = useCallback(
