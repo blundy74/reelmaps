@@ -564,17 +564,38 @@ exports.handler = async (event) => {
       const lat = (y / 20037508.342789244) * 180
       return (180 / Math.PI) * (2 * Math.atan(Math.exp(lat * Math.PI / 180)) - Math.PI / 2)
     }
-    const minLng = mercToLng(bbox3857[0])
-    const minLat = mercToLat(bbox3857[1])
-    const maxLng = mercToLng(bbox3857[2])
-    const maxLat = mercToLat(bbox3857[3])
+    let minLng = mercToLng(bbox3857[0])
+    let minLat = mercToLat(bbox3857[1])
+    let maxLng = mercToLng(bbox3857[2])
+    let maxLat = mercToLat(bbox3857[3])
 
-    // WMS 1.1.1 with SRS=EPSG:4326 uses BBOX=minx(lng),miny(lat),maxx(lng),maxy(lat)
+    // Pad small bboxes to ensure ERDDAP returns data at high zoom levels.
+    // ERDDAP needs at least ~2 degrees per axis to render AFAI reliably.
+    const MIN_SPAN = 2.0
+    const lngSpan = maxLng - minLng
+    const latSpan = maxLat - minLat
+    if (lngSpan < MIN_SPAN) {
+      const pad = (MIN_SPAN - lngSpan) / 2
+      minLng -= pad; maxLng += pad
+    }
+    if (latSpan < MIN_SPAN) {
+      const pad = (MIN_SPAN - latSpan) / 2
+      minLat -= pad; maxLat += pad
+    }
+
+    // Determine which dataset to use based on query param
+    const dataset = (params.dataset === 'daily') ? 'AFAI_1D' : 'AFAI_7D'
+    const datasetId = `noaa_aoml_atlantic_oceanwatch_AFAI_${dataset === 'AFAI_1D' ? '1D' : '7D'}`
+
+    // Use yesterday's date (today's composite may be incomplete)
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
+    const timeStr = params.time || (yesterday.toISOString().slice(0, 10) + 'T12:00:00Z')
+
     const bbox4326 = `${minLng},${minLat},${maxLng},${maxLat}`
-    const wmsUrl = `https://cwcgom.aoml.noaa.gov/erddap/wms/noaa_aoml_atlantic_oceanwatch_AFAI_7D/request` +
+    const wmsUrl = `https://cwcgom.aoml.noaa.gov/erddap/wms/${datasetId}/request` +
       `?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&FORMAT=image/png&TRANSPARENT=true` +
-      `&LAYERS=noaa_aoml_atlantic_oceanwatch_AFAI_7D:AFAI&SRS=EPSG:4326` +
-      `&WIDTH=512&HEIGHT=512&TIME=${(() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10) + 'T12:00:00Z'; })()}&STYLES=&COLORSCALERANGE=-0.002,0.01&BBOX=${bbox4326}`
+      `&LAYERS=${datasetId}:AFAI&SRS=EPSG:4326` +
+      `&WIDTH=512&HEIGHT=512&TIME=${timeStr}&STYLES=&COLORSCALERANGE=-0.002,0.01&BBOX=${bbox4326}`
 
     try {
       const https = require('https')

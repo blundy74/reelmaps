@@ -169,18 +169,18 @@ export function altimetryUrl(_date: string): string {
 // Sargassum / Weedline Detection (NOAA AOML / USF AFAI)
 // ---------------------------------------------------------------------------
 
-/** Sargassum AFAI 7-day composite — pre-rendered tiles from S3. */
+/** Sargassum AFAI 7-day composite — proxied through tile Lambda from ERDDAP WMS. */
 export function sargassumUrl(date: string): string {
   const TILE_BASE = import.meta.env.VITE_HRRR_TILE_URL || 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com'
-  const dateKey = date.replace(/-/g, '')
-  return `${TILE_BASE}/tiles/sargassum/${dateKey}/{z}/{x}/{y}.png`
+  const timeStr = date + 'T12:00:00Z'
+  return `${TILE_BASE}/tiles/sargassum/wms?dataset=7day&time=${timeStr}&BBOX={bbox-epsg-3857}`
 }
 
-/** Sargassum AFAI daily (single-day) — pre-rendered tiles from S3. */
+/** Sargassum AFAI daily — proxied through tile Lambda from ERDDAP WMS. */
 export function sargassumDailyUrl(date: string): string {
   const TILE_BASE = import.meta.env.VITE_HRRR_TILE_URL || 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com'
-  const dateKey = date.replace(/-/g, '')
-  return `${TILE_BASE}/tiles/sargassum-daily/${dateKey}/{z}/{x}/{y}.png`
+  const timeStr = date + 'T12:00:00Z'
+  return `${TILE_BASE}/tiles/sargassum/wms?dataset=daily&time=${timeStr}&BBOX={bbox-epsg-3857}`
 }
 
 // ---------------------------------------------------------------------------
@@ -496,7 +496,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
     name: 'Weedlines (7-day)',
     description: '7-day composite of satellite-detected Sargassum from NOAA AFAI. Fills cloud gaps by merging the last 7 days. Best for overall coverage. Atlantic only (Gulf, Caribbean, tropical Atlantic).',
     group: 'fishing',
-    sourceType: 'raster-xyz',
+    sourceType: 'raster-wms',
     dateDependent: true,
     attribution: 'NOAA AOML / USF Optical Oceanography Lab',
   },
@@ -505,7 +505,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
     name: 'Weedlines (Daily)',
     description: 'Single-day Sargassum detection from NOAA AFAI. Shows today\'s satellite pass only — more cloud gaps but most current positions. Atlantic only.',
     group: 'fishing',
-    sourceType: 'raster-xyz',
+    sourceType: 'raster-wms',
     dateDependent: true,
     attribution: 'NOAA AOML / USF Optical Oceanography Lab',
   },
