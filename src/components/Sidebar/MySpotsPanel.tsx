@@ -102,6 +102,8 @@ function EditSpotModal({ spot, onClose }: { spot: SavedSpot; onClose: () => void
 function SpotMenu({ spot, onEdit, onDelete }: { spot: SavedSpot; onEdit: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({})
 
   useEffect(() => {
     if (!open) return
@@ -112,9 +114,22 @@ function SpotMenu({ spot, onEdit, onDelete }: { spot: SavedSpot; onEdit: () => v
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
+  useEffect(() => {
+    if (!open || !btnRef.current) return
+    const rect = btnRef.current.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    // Open upward if less than 100px below, downward otherwise
+    if (spaceBelow < 100) {
+      setMenuStyle({ bottom: '100%', marginBottom: 4, right: 0 })
+    } else {
+      setMenuStyle({ top: '100%', marginTop: 4, right: 0 })
+    }
+  }, [open])
+
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={btnRef}
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         className="p-1 rounded-md hover:bg-ocean-600 text-slate-500 hover:text-slate-300 transition-colors"
         title="Options"
@@ -125,7 +140,7 @@ function SpotMenu({ spot, onEdit, onDelete }: { spot: SavedSpot; onEdit: () => v
       </button>
 
       {open && (
-        <div className="absolute right-0 bottom-full mb-1 w-36 bg-ocean-800 border border-ocean-600 rounded-xl shadow-xl z-50 overflow-hidden">
+        <div className="absolute w-36 bg-ocean-800 border border-ocean-600 rounded-xl shadow-xl z-50 overflow-hidden" style={menuStyle}>
           <button
             onClick={(e) => { e.stopPropagation(); setOpen(false); onEdit() }}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-ocean-700 transition-colors"
