@@ -5,7 +5,7 @@
 
 import { useWeatherStore } from '../../store/weatherStore'
 import { cn } from '../../lib/utils'
-import FishingReport from './FishingReport'
+// import FishingReport from './FishingReport' // temporarily disabled
 
 interface WeatherLayerDef {
   id: string
@@ -219,11 +219,6 @@ export default function WeatherSidebar({ open, onClose }: Props) {
               </div>
             )
           })}
-        </div>
-
-        {/* AI Fishing Report */}
-        <div className="flex-shrink-0 px-3 py-3 border-t border-ocean-700">
-          <FishingReport />
         </div>
 
         {/* Attribution */}

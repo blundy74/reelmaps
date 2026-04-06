@@ -125,7 +125,7 @@ function SpotMenu({ spot, onEdit, onDelete }: { spot: SavedSpot; onEdit: () => v
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-36 bg-ocean-800 border border-ocean-600 rounded-xl shadow-xl z-50 overflow-hidden">
+        <div className="absolute right-0 bottom-full mb-1 w-36 bg-ocean-800 border border-ocean-600 rounded-xl shadow-xl z-50 overflow-hidden">
           <button
             onClick={(e) => { e.stopPropagation(); setOpen(false); onEdit() }}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-ocean-700 transition-colors"
