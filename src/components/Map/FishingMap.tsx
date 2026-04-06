@@ -126,8 +126,10 @@ export default function FishingMap() {
   // Low-resolution oceanographic layers that benefit from bilinear smoothing
   const SMOOTH_LAYERS = new Set(['ssh-anomaly', 'currents', 'salinity', 'sargassum'])
 
-  // Layers with low source resolution — maxzoom limits tile requests beyond this zoom
-  const LOW_RES_MAXZOOM: Record<string, number> = {}
+  // Layers with unreliable WMS at certain zooms — lock to a specific zoom range
+  const SOURCE_ZOOM_OVERRIDES: Record<string, { minzoom?: number; maxzoom?: number }> = {
+    'sargassum': { minzoom: 4, maxzoom: 6 },
+  }
 
   // ── Add a raster source + layer to the map ───────────────────────────────
   const addRasterLayer = useCallback(
@@ -136,12 +138,14 @@ export default function FishingMap() {
       const tileSize = HI_RES_TILES.has(layerId) ? 512 : 256
 
       if (!map.getSource(sourceId)) {
-        const maxzoom = LOW_RES_MAXZOOM[layerId] ?? (WMS_LAYERS.has(layerId) ? undefined : 18)
+        const zoomOverride = SOURCE_ZOOM_OVERRIDES[layerId]
+        const maxzoom = zoomOverride?.maxzoom ?? (WMS_LAYERS.has(layerId) ? undefined : 18)
         map.addSource(sourceId, {
           type: 'raster',
           tiles,
           tileSize,
           ...(maxzoom ? { maxzoom } : {}),
+          ...(zoomOverride?.minzoom ? { minzoom: zoomOverride.minzoom } : {}),
         })
       }
 
