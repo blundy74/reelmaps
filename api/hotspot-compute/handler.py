@@ -722,13 +722,46 @@ def _update_daily_average_variant(date_str, variant):
         logger.warning(f'{variant} daily average computation failed: {e}')
 
 
+def cleanup_old_grids(max_age_days=180):
+    """Delete S3 grid folders older than max_age_days."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).strftime('%Y%m%d')
+    prefixes = ['grids/hotspot/', 'grids/hotspot-inshore/', 'grids/hotspot-offshore/',
+                'grids/sargassum/', 'grids/sargassum-daily/']
+    deleted = 0
+    for prefix in prefixes:
+        try:
+            resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix, Delimiter='/')
+            for cp in resp.get('CommonPrefixes', []):
+                folder = cp['Prefix']
+                # Extract date from folder name (e.g., 'grids/hotspot/20260101/')
+                parts = folder.rstrip('/').split('/')
+                date_part = parts[-1] if parts else ''
+                if date_part.isdigit() and len(date_part) == 8 and date_part < cutoff:
+                    # Delete all objects in this folder
+                    objs = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=folder)
+                    for obj in objs.get('Contents', []):
+                        s3.delete_object(Bucket=S3_BUCKET, Key=obj['Key'])
+                        deleted += 1
+                    logger.info(f'Cleaned up {folder}')
+        except Exception as e:
+            logger.warning(f'Cleanup error for {prefix}: {e}')
+    logger.info(f'Cleanup complete: {deleted} objects deleted (cutoff: {cutoff})')
+    return deleted
+
+
 def handler(event, context):
     """Lambda entry point — compute fishing hotspot scores.
     Optional event keys:
       target_date: YYYYMMDD — compute for a specific date (uses SST from that day)
+      cleanup: true — delete grids older than 6 months
     """
     try:
         now = datetime.now(timezone.utc)
+
+        # Cleanup old grids if requested or on the first run of each day (hour 0)
+        if (isinstance(event, dict) and event.get('cleanup')) or now.hour == 0:
+            cleanup_old_grids(max_age_days=180)
+
         # Allow override for backfilling historical data
         target_date = event.get('target_date') if isinstance(event, dict) else None
         if target_date and len(target_date) == 8:
