@@ -154,7 +154,7 @@ export default function Sidebar({ onImportClick }: { onImportClick?: () => void 
         </div>
 
         {/* Tab content */}
-        <div className="flex-1 overflow-hidden relative">
+        <div className="flex-1 overflow-y-auto relative">
           {/* Spots tab is always accessible (free) */}
           {activeTab === 'spots' && <SpotsList />}
 
