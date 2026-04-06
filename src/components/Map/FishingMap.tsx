@@ -697,6 +697,19 @@ export default function FishingMap() {
       openSpotPopup(map, spot, e.lngLat)
     })
 
+    // Click on FAD icons
+    map.on('click', 'fishing-spots-fads', (e) => {
+      if (!e.features?.length) return
+      const props = e.features[0].properties as { id: string }
+      const spot = FISHING_SPOTS.find((s) => s.id === props.id)
+      if (!spot) return
+      setSelectedSpot(spot)
+      openSpotPopup(map, spot, e.lngLat)
+    })
+
+    map.on('mouseenter', 'fishing-spots-fads', () => { map.getCanvas().style.cursor = 'pointer' })
+    map.on('mouseleave', 'fishing-spots-fads', () => { map.getCanvas().style.cursor = '' })
+
     // Click on clusters → zoom in
     map.on('click', 'clusters', (e) => {
       const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })
