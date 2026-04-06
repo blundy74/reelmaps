@@ -252,6 +252,35 @@ function buildHotspotRamp() {
 }
 buildHotspotRamp()
 
+// ── Sargassum / Weedline color ramp (0=none, 255=dense sargassum) ─────────
+// Dark teal → green → yellow → orange → red
+const SARGASSUM_RAMP = new Uint8Array(256 * 4)
+function buildSargassumRamp() {
+  SARGASSUM_RAMP[0] = 0; SARGASSUM_RAMP[1] = 0; SARGASSUM_RAMP[2] = 0; SARGASSUM_RAMP[3] = 0
+  for (let i = 1; i <= 255; i++) {
+    const t = i / 255
+    let r, g, b, a
+    if (t < 0.1) {
+      r = 38; g = 70; b = 83; a = Math.round(t * 10 * 180)
+    } else if (t < 0.3) {
+      const s = (t - 0.1) / 0.2
+      r = Math.round(38 + s * 4); g = Math.round(70 + s * 87); b = Math.round(83 + s * 60); a = 200
+    } else if (t < 0.5) {
+      const s = (t - 0.3) / 0.2
+      r = Math.round(42 + s * 191); g = Math.round(157 + s * 39); b = Math.round(143 - s * 37); a = 220
+    } else if (t < 0.7) {
+      const s = (t - 0.5) / 0.2
+      r = Math.round(233 + s * 11); g = Math.round(196 - s * 34); b = Math.round(106 - s * 9); a = 235
+    } else {
+      const s = (t - 0.7) / 0.3
+      r = Math.round(244 - s * 13); g = Math.round(162 - s * 50); b = Math.round(97 - s * 16); a = 250
+    }
+    const off = i * 4
+    SARGASSUM_RAMP[off] = r; SARGASSUM_RAMP[off + 1] = g; SARGASSUM_RAMP[off + 2] = b; SARGASSUM_RAMP[off + 3] = a
+  }
+}
+buildSargassumRamp()
+
 // Map variable name to its color ramp
 const RAMPS = {
   precip: COLOR_RAMP,
@@ -262,6 +291,7 @@ const RAMPS = {
   cloud: CLOUD_RAMP,
   waves: WAVE_RAMP,
   hotspot: HOTSPOT_RAMP,
+  sargassum: SARGASSUM_RAMP,
 }
 
 // ── Web Mercator math ───────────────────────────────────────────────────────
@@ -502,7 +532,7 @@ exports.handler = async (event) => {
   // GET /tiles/sargassum/{...} — proxy AOML ERDDAP Sargassum WMS (CORS + reprojection)
   // AOML ERDDAP only supports EPSG:4326, but MapLibre sends EPSG:3857 bbox.
   // We reproject the bbox from 3857→4326 before forwarding.
-  if (path.includes('/tiles/sargassum/')) {
+  if (path.includes('/tiles/sargassum/wms')) {
     const params = event.queryStringParameters || {}
     // Function URLs may put bbox in rawQueryString; parse it if queryStringParameters is empty
     let bboxStr = params.BBOX || params.bbox || ''
@@ -625,6 +655,26 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: EMPTY_PNG.toString('base64'), isBase64Encoded: true }
     }
     const pngBuffer = renderTile(grid, bbox, HOTSPOT_RAMP)
+    return { statusCode: 200, headers, body: pngBuffer.toString('base64'), isBase64Encoded: true }
+  }
+
+  // GET /tiles/sargassum/{date}/{z}/{x}/{y}.png — sargassum weedline tiles
+  const matchSargassum = path.match(/\/tiles\/sargassum\/(\d{8})\/(\d+)\/(\d+)\/(\d+)\.png/)
+  if (matchSargassum) {
+    const [, sDate, sZ, sX, sY] = matchSargassum
+    const z = parseInt(sZ, 10), x = parseInt(sX, 10), y = parseInt(sY, 10)
+    if (z < 3 || z > 10) {
+      return { statusCode: 200, headers, body: EMPTY_PNG.toString('base64'), isBase64Encoded: true }
+    }
+    const bbox = tileBbox(z, x, y)
+    if (bbox.latMax < 0 || bbox.latMin > 38 || bbox.lngMax < -98 || bbox.lngMin > -38) {
+      return { statusCode: 200, headers, body: EMPTY_PNG.toString('base64'), isBase64Encoded: true }
+    }
+    const grid = await loadHotspotGrid(sDate, 'sargassum')
+    if (!grid) {
+      return { statusCode: 200, headers, body: EMPTY_PNG.toString('base64'), isBase64Encoded: true }
+    }
+    const pngBuffer = renderTile(grid, bbox, SARGASSUM_RAMP)
     return { statusCode: 200, headers, body: pngBuffer.toString('base64'), isBase64Encoded: true }
   }
 

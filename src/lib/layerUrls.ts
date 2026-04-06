@@ -169,12 +169,12 @@ export function altimetryUrl(_date: string): string {
 // Sargassum / Weedline Detection (NOAA AOML / USF AFAI)
 // ---------------------------------------------------------------------------
 
-/** Sargassum AFAI 7-day composite — floating algae detection from MODIS/VIIRS.
- *  Proxied through our tile Lambda which reprojects BBOX from 3857→4326.
+/** Sargassum AFAI 7-day composite — pre-rendered tiles from S3.
  *  Covers Gulf of Mexico, Caribbean, and tropical Atlantic (0-38N, 98W-38W). */
-export function sargassumUrl(_date: string): string {
+export function sargassumUrl(date: string): string {
   const TILE_BASE = import.meta.env.VITE_HRRR_TILE_URL || 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com'
-  return `${TILE_BASE}/tiles/sargassum/wms?BBOX={bbox-epsg-3857}`
+  const dateKey = date.replace(/-/g, '')
+  return `${TILE_BASE}/tiles/sargassum/${dateKey}/{z}/{x}/{y}.png`
 }
 
 // ---------------------------------------------------------------------------
@@ -490,8 +490,8 @@ export const LAYER_REGISTRY: LayerDef[] = [
     name: 'Sargassum / Weedlines (7-day Avg)',
     description: 'Satellite-detected floating Sargassum seaweed from NOAA AFAI (Alternative Floating Algae Index). 7-day composite at ~1.5km resolution. Weedlines concentrate mahi-mahi, wahoo, tuna, and billfish along their edges. Gulf of Mexico, Caribbean, and tropical Atlantic.',
     group: 'fishing',
-    sourceType: 'raster-wms',
-    dateDependent: false,
+    sourceType: 'raster-xyz',
+    dateDependent: true,
     attribution: 'NOAA AOML / USF Optical Oceanography Lab',
   },
   {

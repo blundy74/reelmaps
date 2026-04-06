@@ -88,7 +88,6 @@ const WMS_LAYERS = new Set([
   'currents',
   'ssh-anomaly',
   'altimetry',
-  'sargassum',
 ])
 
 export default function FishingMap() {
@@ -126,10 +125,8 @@ export default function FishingMap() {
   // Low-resolution oceanographic layers that benefit from bilinear smoothing
   const SMOOTH_LAYERS = new Set(['ssh-anomaly', 'currents', 'salinity', 'sargassum'])
 
-  // Layers with unreliable WMS at certain zooms — lock to a specific zoom range
-  const SOURCE_ZOOM_OVERRIDES: Record<string, { minzoom?: number; maxzoom?: number }> = {
-    'sargassum': { minzoom: 4, maxzoom: 6 },
-  }
+  // Source zoom overrides for specific layers
+  const SOURCE_ZOOM_OVERRIDES: Record<string, { minzoom?: number; maxzoom?: number }> = {}
 
   // ── Add a raster source + layer to the map ───────────────────────────────
   const addRasterLayer = useCallback(
