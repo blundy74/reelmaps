@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
+import { requestPasswordReset, resetPassword } from '../../lib/apiClient'
 import { cn } from '../../lib/utils'
 
 // ── End User License Agreement ──────────────────────────────────────────────
@@ -96,6 +97,13 @@ export default function AuthModal() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [eulaAccepted, setEulaAccepted] = useState(false)
   const [showEula, setShowEula] = useState(false)
+  const [resetMode, setResetMode] = useState<'off' | 'email' | 'sent' | 'code'>('off')
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetCode, setResetCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetError, setResetError] = useState('')
+  const [resetSuccess, setResetSuccess] = useState('')
 
   if (!showAuthModal) return null
 
@@ -168,7 +176,106 @@ export default function AuthModal() {
           </div>
         </div>
 
-        {/* Form */}
+        {/* Reset password flow */}
+        {resetMode !== 'off' && authMode === 'login' ? (
+          <div className="px-6 py-5 space-y-4">
+            {resetMode === 'email' && (
+              <>
+                <p className="text-sm text-slate-300">Enter your email and we'll send you a reset code.</p>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wider mb-1.5">Email</label>
+                  <input
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="captain@reelmaps.ai"
+                    required
+                    className="w-full px-3 py-2.5 rounded-lg bg-ocean-800 border border-ocean-600 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+                  />
+                </div>
+                {resetError && <p className="text-xs text-red-400">{resetError}</p>}
+                <button
+                  onClick={async () => {
+                    setResetLoading(true); setResetError('')
+                    try {
+                      await requestPasswordReset(resetEmail)
+                      setResetMode('sent')
+                    } catch (err: any) { setResetError(err.message || 'Failed to send reset code') }
+                    setResetLoading(false)
+                  }}
+                  disabled={resetLoading || !resetEmail}
+                  className="w-full py-2.5 rounded-lg text-sm font-semibold bg-cyan-500 text-white hover:bg-cyan-400 transition-all disabled:opacity-50"
+                >
+                  {resetLoading ? 'Sending...' : 'Send Reset Code'}
+                </button>
+                <button onClick={() => setResetMode('off')} className="w-full text-xs text-slate-500 hover:text-slate-300 py-1">
+                  Back to sign in
+                </button>
+              </>
+            )}
+            {resetMode === 'sent' && (
+              <>
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                  <p className="text-xs text-emerald-400">Reset code sent to {resetEmail}. Check your email.</p>
+                </div>
+                <button onClick={() => setResetMode('code')} className="w-full py-2.5 rounded-lg text-sm font-semibold bg-cyan-500 text-white hover:bg-cyan-400 transition-all">
+                  Enter Reset Code
+                </button>
+              </>
+            )}
+            {resetMode === 'code' && (
+              <>
+                <p className="text-sm text-slate-300">Enter the code from your email and your new password.</p>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wider mb-1.5">Reset Code</label>
+                  <input
+                    type="text"
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value)}
+                    placeholder="6-digit code"
+                    className="w-full px-3 py-2.5 rounded-lg bg-ocean-800 border border-ocean-600 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 font-mono tracking-widest text-center"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wider mb-1.5">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Min 8 characters"
+                    minLength={8}
+                    className="w-full px-3 py-2.5 rounded-lg bg-ocean-800 border border-ocean-600 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+                  />
+                </div>
+                {resetError && <p className="text-xs text-red-400">{resetError}</p>}
+                {resetSuccess && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                    <p className="text-xs text-emerald-400">{resetSuccess}</p>
+                  </div>
+                )}
+                <button
+                  onClick={async () => {
+                    setResetLoading(true); setResetError(''); setResetSuccess('')
+                    try {
+                      await resetPassword(resetEmail, resetCode, newPassword)
+                      setResetSuccess('Password reset! You can now sign in.')
+                      setTimeout(() => { setResetMode('off'); setResetSuccess('') }, 2000)
+                    } catch (err: any) { setResetError(err.message || 'Reset failed') }
+                    setResetLoading(false)
+                  }}
+                  disabled={resetLoading || !resetCode || newPassword.length < 8}
+                  className="w-full py-2.5 rounded-lg text-sm font-semibold bg-cyan-500 text-white hover:bg-cyan-400 transition-all disabled:opacity-50"
+                >
+                  {resetLoading ? 'Resetting...' : 'Reset Password'}
+                </button>
+                <button onClick={() => setResetMode('off')} className="w-full text-xs text-slate-500 hover:text-slate-300 py-1">
+                  Back to sign in
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+        /* Normal login/register form */
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           {authMode === 'register' && (
             <div>
@@ -196,7 +303,18 @@ export default function AuthModal() {
           </div>
 
           <div>
-            <label className="block text-xs text-slate-500 uppercase tracking-wider mb-1.5">Password</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs text-slate-500 uppercase tracking-wider">Password</label>
+              {authMode === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => { setResetMode('email'); setResetEmail(email) }}
+                  className="text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
             <input
               type="password"
               value={password}
@@ -295,6 +413,7 @@ export default function AuthModal() {
             )}
           </button>
         </form>
+        )}
 
         {/* Footer */}
         <div className="px-6 pb-5">
