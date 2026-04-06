@@ -61,6 +61,7 @@ export interface AuthUser {
   emailVerified?: boolean
   isPremium?: boolean
   subscriptionRenewDate?: string | null
+  subscriptionExpiresAt?: string | null
   eulaAccepted?: boolean
   eulaVersion?: string | null
 }

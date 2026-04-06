@@ -14,7 +14,7 @@ interface HeaderProps {
 // ── Account Modal ──────────────────────────────────────────────────────────
 
 function AccountModal({ user, onLogout, onClose }: {
-  user: { email: string; displayName?: string; avatarUrl?: string; emailVerified?: boolean; isPremium?: boolean; subscriptionRenewDate?: string | null }
+  user: { email: string; displayName?: string; avatarUrl?: string; emailVerified?: boolean; isPremium?: boolean; subscriptionRenewDate?: string | null; subscriptionExpiresAt?: string | null }
   onLogout: () => void
   onClose: () => void
 }) {
@@ -71,7 +71,16 @@ function AccountModal({ user, onLogout, onClose }: {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-slate-200">Premium Member</p>
-                  {user.subscriptionRenewDate ? (
+
+                  {/* Show expiration date if cancelled, otherwise show renewal date */}
+                  {user.subscriptionExpiresAt ? (
+                    <p className="text-xs text-amber-400 mt-1">
+                      Premium expires on{' '}
+                      <span className="font-medium">
+                        {new Date(user.subscriptionExpiresAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </p>
+                  ) : user.subscriptionRenewDate ? (
                     <p className="text-xs text-slate-400 mt-1">
                       Auto-renews on{' '}
                       <span className="text-slate-300 font-medium">
@@ -79,7 +88,7 @@ function AccountModal({ user, onLogout, onClose }: {
                       </span>
                     </p>
                   ) : (
-                    <p className="text-xs text-slate-500 mt-1">Auto-renew is off</p>
+                    <p className="text-xs text-slate-500 mt-1">Active subscription</p>
                   )}
 
                   {/* Manage billing via Stripe Portal */}
@@ -95,8 +104,8 @@ function AccountModal({ user, onLogout, onClose }: {
                     Manage billing
                   </button>
 
-                  {/* Cancel / confirm */}
-                  {user.subscriptionRenewDate && cancelState === 'idle' && (
+                  {/* Downgrade — only show if not already cancelled */}
+                  {!user.subscriptionExpiresAt && cancelState === 'idle' && (
                     <button
                       onClick={() => setCancelState('confirm')}
                       className="text-[10px] text-slate-600 hover:text-red-400 transition-colors mt-1 underline underline-offset-2"
@@ -106,10 +115,10 @@ function AccountModal({ user, onLogout, onClose }: {
                   )}
                   {cancelState === 'confirm' && (
                     <div className="mt-3 bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-2">
-                      <p className="text-xs text-slate-400">Your premium access will remain active until the current billing period ends. Are you sure?</p>
+                      <p className="text-xs text-slate-400">Your premium access will remain active until the end of your current billing period. After that, your account will revert to the free plan. Are you sure?</p>
                       <div className="flex gap-2">
                         <button onClick={() => setCancelState('idle')} className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-ocean-800 text-slate-400 hover:text-slate-200 hover:bg-ocean-700 border border-ocean-700 transition-all">
-                          Keep
+                          Keep Premium
                         </button>
                         <button
                           onClick={async () => {
@@ -122,7 +131,7 @@ function AccountModal({ user, onLogout, onClose }: {
                           }}
                           className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-red-400 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 transition-all"
                         >
-                          Cancel Renew
+                          Downgrade
                         </button>
                       </div>
                     </div>
@@ -133,7 +142,7 @@ function AccountModal({ user, onLogout, onClose }: {
                     </div>
                   )}
                   {cancelState === 'done' && (
-                    <p className="text-xs text-emerald-400 mt-2">Auto-renew cancelled.</p>
+                    <p className="text-xs text-amber-400 mt-2">Subscription cancelled. You'll keep premium access until the end of your billing period.</p>
                   )}
                 </div>
               </div>
