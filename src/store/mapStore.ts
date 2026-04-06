@@ -193,7 +193,7 @@ export const useMapStore = create<MapState>()(
     }),
     {
       name: 'reelmaps-map-state',
-      version: 9,
+      version: 10,
       partialize: (state) => ({
         layers: state.layers,
         basemap: state.basemap,
