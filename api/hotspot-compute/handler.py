@@ -970,10 +970,15 @@ def handler(event, context):
                 logger.info(f'Sargassum: {nonzero} valid pixels')
 
                 # Normalize AFAI values to 0-255
-                # AFAI range is typically -0.002 to 0.01+ for sargassum
-                # Values below 0 = no sargassum, above 0 = sargassum
+                # AFAI > 0 = sargassum present, AFAI <= 0 = no sargassum (transparent)
+                # Typical sargassum range: 0.001 to 0.02+
+                # Use threshold of 0.0005 to filter out noise
+                SARG_THRESHOLD = 0.0005
+                SARG_MAX = 0.015  # values above this are "dense"
+
                 sarg_norm = np.zeros_like(sargassum_grid, dtype=np.float32)
-                sarg_norm[valid] = np.clip((sargassum_grid[valid] + 0.002) / 0.012, 0, 1)
+                sarg_positive = valid & (sargassum_grid > SARG_THRESHOLD)
+                sarg_norm[sarg_positive] = np.clip(sargassum_grid[sarg_positive] / SARG_MAX, 0, 1)
 
                 # Apply light smoothing
                 sarg_norm = gaussian_filter(sarg_norm, sigma=0.5)
@@ -981,6 +986,8 @@ def handler(event, context):
                 sarg_quantized = np.zeros_like(sarg_norm, dtype=np.uint8)
                 sarg_valid = sarg_norm > 0.01
                 sarg_quantized[sarg_valid] = np.clip(sarg_norm[sarg_valid] * 255, 1, 255).astype(np.uint8)
+
+                logger.info(f'Sargassum positive pixels (AFAI > {SARG_THRESHOLD}): {np.count_nonzero(sarg_positive)}')
 
                 # Upload
                 sarg_key = f'grids/sargassum/{date_str}/latest.bin.gz'
@@ -998,8 +1005,11 @@ def handler(event, context):
             sarg_daily = fetch_sargassum_daily_grid()
             if sarg_daily is not None:
                 valid = ~np.isnan(sarg_daily)
+                SARG_THRESHOLD = 0.0005
+                SARG_MAX = 0.015
                 sarg_d_norm = np.zeros_like(sarg_daily, dtype=np.float32)
-                sarg_d_norm[valid] = np.clip((sarg_daily[valid] + 0.002) / 0.012, 0, 1)
+                sarg_d_positive = valid & (sarg_daily > SARG_THRESHOLD)
+                sarg_d_norm[sarg_d_positive] = np.clip(sarg_daily[sarg_d_positive] / SARG_MAX, 0, 1)
                 sarg_d_norm = gaussian_filter(sarg_d_norm, sigma=0.5)
 
                 sarg_d_q = np.zeros_like(sarg_d_norm, dtype=np.uint8)
