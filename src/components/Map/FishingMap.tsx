@@ -121,10 +121,13 @@ export default function FishingMap() {
   )
 
   // Layers that use 512px tiles for higher visual quality
-  const HI_RES_TILES = new Set(['ssh-anomaly', 'altimetry', 'currents'])
+  const HI_RES_TILES = new Set(['ssh-anomaly', 'altimetry', 'currents', 'sargassum'])
 
   // Low-resolution oceanographic layers that benefit from bilinear smoothing
-  const SMOOTH_LAYERS = new Set(['ssh-anomaly', 'currents', 'salinity'])
+  const SMOOTH_LAYERS = new Set(['ssh-anomaly', 'currents', 'salinity', 'sargassum'])
+
+  // Layers with low source resolution that should stop requesting new tiles at a certain zoom
+  const LOW_RES_MAXZOOM: Record<string, number> = { 'sargassum': 7 }
 
   // ── Add a raster source + layer to the map ───────────────────────────────
   const addRasterLayer = useCallback(
@@ -133,12 +136,12 @@ export default function FishingMap() {
       const tileSize = HI_RES_TILES.has(layerId) ? 512 : 256
 
       if (!map.getSource(sourceId)) {
+        const maxzoom = LOW_RES_MAXZOOM[layerId] ?? (WMS_LAYERS.has(layerId) ? undefined : 18)
         map.addSource(sourceId, {
           type: 'raster',
           tiles,
           tileSize,
-          // WMS layers shouldn't cache aggressively
-          ...(WMS_LAYERS.has(layerId) ? {} : { maxzoom: 18 }),
+          ...(maxzoom ? { maxzoom } : {}),
         })
       }
 
