@@ -532,7 +532,7 @@ exports.handler = async (event) => {
     const wmsUrl = `https://cwcgom.aoml.noaa.gov/erddap/wms/noaa_aoml_atlantic_oceanwatch_AFAI_7D/request` +
       `?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&FORMAT=image/png&TRANSPARENT=true` +
       `&LAYERS=noaa_aoml_atlantic_oceanwatch_AFAI_7D:AFAI&SRS=EPSG:4326` +
-      `&WIDTH=512&HEIGHT=512&TIME=last&STYLES=&COLORSCALERANGE=-0.01,0.05&BBOX=${bbox4326}`
+      `&WIDTH=512&HEIGHT=512&TIME=${(() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10) + 'T12:00:00Z'; })()}&STYLES=&COLORSCALERANGE=-0.002,0.01&BBOX=${bbox4326}`
 
     try {
       const https = require('https')
