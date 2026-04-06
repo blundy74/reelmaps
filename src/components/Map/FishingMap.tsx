@@ -90,8 +90,6 @@ const WMS_LAYERS = new Set([
   'currents',
   'ssh-anomaly',
   'altimetry',
-  'sargassum',
-  'sargassum-daily',
 ])
 
 export default function FishingMap() {

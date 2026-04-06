@@ -253,28 +253,29 @@ function buildHotspotRamp() {
 buildHotspotRamp()
 
 // ── Sargassum / Weedline color ramp (0=none, 255=dense sargassum) ─────────
-// Vibrant rainbow: deep purple → blue → cyan → green → yellow → orange → red
-// Matches the colorful ERDDAP WMS palette
+// Matches ERDDAP's rainbow palette for COLORSCALERANGE=-0.002,0.01
+// Grid value 0=-0.002 (purple), ~42=0.0 (blue), 128=0.004 (green), 255=0.01 (red)
 const SARGASSUM_RAMP = new Uint8Array(256 * 4)
 function buildSargassumRamp() {
   SARGASSUM_RAMP[0] = 0; SARGASSUM_RAMP[1] = 0; SARGASSUM_RAMP[2] = 0; SARGASSUM_RAMP[3] = 0
-  // Color stops: [position 0-1, r, g, b]
+  // ERDDAP rainbow stops matched to grid positions
   const stops = [
-    [0.00, 102,   0, 255],  // deep purple
-    [0.10,  50,  20, 220],  // blue-purple
-    [0.20,   0,  80, 255],  // blue
-    [0.30,   0, 160, 255],  // cyan-blue
-    [0.40,   0, 220, 200],  // cyan
-    [0.50,   0, 200, 100],  // teal-green
-    [0.60,  50, 220,  50],  // green
-    [0.70, 160, 230,   0],  // yellow-green
-    [0.80, 240, 200,   0],  // yellow
-    [0.90, 255, 140,   0],  // orange
-    [1.00, 255,  60,   0],  // red
+    [0.00, 128,   0, 255],  // purple (AFAI = -0.002)
+    [0.08, 102,   0, 255],  // deep purple
+    [0.17,  40,  20, 255],  // blue-purple (AFAI ~ -0.001)
+    [0.25,   0,  60, 255],  // blue
+    [0.33,   0, 140, 255],  // cyan-blue (AFAI ~ 0)
+    [0.42,   0, 200, 240],  // cyan
+    [0.50,   0, 210, 160],  // teal (AFAI ~ 0.004)
+    [0.58,  20, 220,  80],  // green
+    [0.67, 100, 230,   0],  // yellow-green (AFAI ~ 0.006)
+    [0.75, 200, 220,   0],  // yellow
+    [0.83, 255, 180,   0],  // orange (AFAI ~ 0.008)
+    [0.92, 255, 100,   0],  // dark orange
+    [1.00, 255,  40,   0],  // red (AFAI = 0.01)
   ]
   for (let i = 1; i <= 255; i++) {
     const t = i / 255
-    // Find surrounding stops
     let s0 = stops[0], s1 = stops[stops.length - 1]
     for (let j = 0; j < stops.length - 1; j++) {
       if (t >= stops[j][0] && t <= stops[j + 1][0]) {
@@ -285,8 +286,8 @@ function buildSargassumRamp() {
     const r = Math.round(s0[1] + f * (s1[1] - s0[1]))
     const g = Math.round(s0[2] + f * (s1[2] - s0[2]))
     const b = Math.round(s0[3] + f * (s1[3] - s0[3]))
-    // Alpha: fade in at low values, full opacity above 15%
-    const a = t < 0.08 ? Math.round(t / 0.08 * 200) : t < 0.15 ? 200 : 230
+    // Alpha: fade in gently, full opacity from 10%+
+    const a = t < 0.05 ? Math.round(t / 0.05 * 180) : t < 0.12 ? 190 : 220
     const off = i * 4
     SARGASSUM_RAMP[off] = r; SARGASSUM_RAMP[off + 1] = g; SARGASSUM_RAMP[off + 2] = b; SARGASSUM_RAMP[off + 3] = a
   }
