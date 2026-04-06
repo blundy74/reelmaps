@@ -507,6 +507,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
     sourceType: 'raster-xyz',
     dateDependent: true,
     attribution: 'NOAA AOML / USF Optical Oceanography Lab',
+    attribution: 'NOAA AOML / USF Optical Oceanography Lab',
   },
   {
     id: 'fishing-spots',
