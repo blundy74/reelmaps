@@ -155,27 +155,34 @@ export default function Sidebar({ onImportClick }: { onImportClick?: () => void 
 
         {/* Tab content */}
         <div className="flex-1 overflow-hidden relative">
-          <div className={cn(!isPremium && 'opacity-50 pointer-events-none select-none')}>
-            {activeTab === 'layers' && <LayerPanel />}
-            {activeTab === 'spots' && <SpotsList />}
-            {activeTab === 'my-spots' && <MySpotsPanel onImportClick={onImportClick} />}
-          </div>
-          {!isPremium && (
-            <div className="absolute inset-0 flex items-end justify-center pb-6 pointer-events-none">
-              <div className="pointer-events-auto relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-ocean-900/95 to-cyan-500/10 p-4 mx-4 backdrop-blur-sm shadow-2xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-amber-400 mb-0.5">Upgrade to Premium</p>
-                    <p className="text-[10px] text-slate-500">Unlock satellite layers, AI hotspots, fishing spots, and more.</p>
+          {/* Spots tab is always accessible (free) */}
+          {activeTab === 'spots' && <SpotsList />}
+
+          {/* Layers and My Spots are premium-gated */}
+          {activeTab !== 'spots' && (
+            <>
+              <div className={cn(!isPremium && 'opacity-50 pointer-events-none select-none')}>
+                {activeTab === 'layers' && <LayerPanel />}
+                {activeTab === 'my-spots' && <MySpotsPanel onImportClick={onImportClick} />}
+              </div>
+              {!isPremium && (
+                <div className="absolute inset-0 flex items-end justify-center pb-6 pointer-events-none">
+                  <div className="pointer-events-auto relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-ocean-900/95 to-cyan-500/10 p-4 mx-4 backdrop-blur-sm shadow-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-amber-400 mb-0.5">Upgrade to Premium</p>
+                        <p className="text-[10px] text-slate-500">Unlock satellite layers, AI hotspots, spot imports, and more.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
         </div>
       </aside>

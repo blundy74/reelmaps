@@ -26,12 +26,121 @@ const { query, execute } = require('./db.js')
 const { sendEmail } = require('./email.js')
 const { getVerificationEmailHtml, getWelcomeEmailHtml, getGoodbyeEmailHtml } = require('./emailTemplates.js')
 
+const Stripe = require('stripe')
+
 const app = express()
 const PORT = process.env.PORT || 3001
 const JWT_SECRET = process.env.JWT_SECRET || 'reelmaps-dev-secret-change-in-prod'
 const JWT_EXPIRY = '7d'
+const APP_URL = process.env.APP_URL || 'https://reelmaps.ai'
+
+// Stripe configuration
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-12-18.acacia' })
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || ''
+const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || '' // Monthly subscription price ID
 
 app.use(cors())
+
+// Stripe webhook needs raw body — must be BEFORE express.json()
+app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  let event
+  try {
+    if (STRIPE_WEBHOOK_SECRET) {
+      const sig = req.headers['stripe-signature']
+      event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET)
+    } else {
+      event = JSON.parse(req.body.toString())
+    }
+  } catch (err) {
+    console.error('Stripe webhook signature verification failed:', err.message)
+    return res.status(400).json({ error: 'Webhook signature verification failed' })
+  }
+
+  console.log(`Stripe webhook: ${event.type}`)
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object
+        const userId = session.metadata?.userId || session.client_reference_id
+        const customerId = session.customer
+        const subscriptionId = session.subscription
+
+        if (userId) {
+          await execute(
+            `UPDATE users SET is_premium = true, stripe_customer_id = $1, stripe_subscription_id = $2, updated_at = NOW() WHERE id = $3`,
+            [customerId, subscriptionId, userId]
+          )
+
+          // Fetch subscription to get renewal date
+          if (subscriptionId) {
+            const sub = await stripe.subscriptions.retrieve(subscriptionId)
+            const renewDate = new Date(sub.current_period_end * 1000).toISOString()
+            await execute('UPDATE users SET subscription_renew_date = $1 WHERE id = $2', [renewDate, userId])
+          }
+
+          console.log(`User ${userId} upgraded to premium (customer: ${customerId}, subscription: ${subscriptionId})`)
+        }
+        break
+      }
+
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object
+        const customerId = invoice.customer
+        const subscriptionId = invoice.subscription
+
+        if (subscriptionId) {
+          const sub = await stripe.subscriptions.retrieve(subscriptionId)
+          const renewDate = new Date(sub.current_period_end * 1000).toISOString()
+          await execute(
+            `UPDATE users SET is_premium = true, subscription_renew_date = $1, updated_at = NOW() WHERE stripe_customer_id = $2`,
+            [renewDate, customerId]
+          )
+          console.log(`Subscription renewed for customer ${customerId}, next renewal: ${renewDate}`)
+        }
+        break
+      }
+
+      case 'customer.subscription.updated': {
+        const sub = event.data.object
+        const customerId = sub.customer
+
+        if (sub.cancel_at_period_end) {
+          // User cancelled — keep premium until period ends, clear renew date
+          await execute(
+            `UPDATE users SET subscription_renew_date = NULL, updated_at = NOW() WHERE stripe_customer_id = $1`,
+            [customerId]
+          )
+          console.log(`Subscription cancellation scheduled for customer ${customerId}`)
+        } else {
+          // Subscription reactivated or updated
+          const renewDate = new Date(sub.current_period_end * 1000).toISOString()
+          await execute(
+            `UPDATE users SET subscription_renew_date = $1, updated_at = NOW() WHERE stripe_customer_id = $2`,
+            [renewDate, customerId]
+          )
+        }
+        break
+      }
+
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object
+        const customerId = sub.customer
+        await execute(
+          `UPDATE users SET is_premium = false, stripe_subscription_id = NULL, subscription_renew_date = NULL, updated_at = NOW() WHERE stripe_customer_id = $1`,
+          [customerId]
+        )
+        console.log(`Subscription ended for customer ${customerId} — premium revoked`)
+        break
+      }
+    }
+  } catch (err) {
+    console.error('Stripe webhook processing error:', err)
+  }
+
+  res.json({ received: true })
+})
+
 app.use(express.json())
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -265,7 +374,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
     const result = await query(
-      'SELECT id, email, display_name, avatar_url, email_verified, is_premium, eula_accepted, eula_version, created_at FROM users WHERE id = $1',
+      'SELECT id, email, display_name, avatar_url, email_verified, is_premium, subscription_renew_date, eula_accepted, eula_version, created_at FROM users WHERE id = $1',
       [req.user.userId]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' })
@@ -278,9 +387,88 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
     logActivity(req, req.user.sessionId)
 
     const row = result.rows[0]
-    res.json({ id: row.id, email: row.email, displayName: row.display_name, avatarUrl: row.avatar_url, emailVerified: row.email_verified, isPremium: row.is_premium ?? false, eulaAccepted: row.eula_accepted ?? false, eulaVersion: row.eula_version || null, createdAt: row.created_at })
+    res.json({ id: row.id, email: row.email, displayName: row.display_name, avatarUrl: row.avatar_url, emailVerified: row.email_verified, isPremium: row.is_premium ?? false, subscriptionRenewDate: row.subscription_renew_date || null, eulaAccepted: row.eula_accepted ?? false, eulaVersion: row.eula_version || null, createdAt: row.created_at })
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user' })
+  }
+})
+
+// ── Subscription Management ─────────────────────────────────────────────────
+
+// Create a Stripe Checkout session for subscription
+app.post('/api/subscription/checkout', authenticateToken, async (req, res) => {
+  try {
+    const userResult = await query('SELECT id, email, display_name, stripe_customer_id FROM users WHERE id = $1', [req.user.userId])
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' })
+
+    const user = userResult.rows[0]
+
+    // Create or reuse Stripe customer
+    let customerId = user.stripe_customer_id
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: user.display_name || undefined,
+        metadata: { userId: user.id },
+      })
+      customerId = customer.id
+      await execute('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [customerId, user.id])
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: 'subscription',
+      line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
+      success_url: `${APP_URL}/app?upgraded=true`,
+      cancel_url: `${APP_URL}/app`,
+      client_reference_id: user.id,
+      metadata: { userId: user.id },
+      subscription_data: { metadata: { userId: user.id } },
+    })
+
+    res.json({ url: session.url })
+  } catch (err) {
+    console.error('Checkout session error:', err)
+    res.status(500).json({ error: 'Failed to create checkout session' })
+  }
+})
+
+// Create a Stripe Customer Portal session (manage billing, update payment, cancel)
+app.post('/api/subscription/portal', authenticateToken, async (req, res) => {
+  try {
+    const userResult = await query('SELECT stripe_customer_id FROM users WHERE id = $1', [req.user.userId])
+    const customerId = userResult.rows[0]?.stripe_customer_id
+    if (!customerId) return res.status(400).json({ error: 'No subscription found' })
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${APP_URL}/app`,
+    })
+
+    res.json({ url: session.url })
+  } catch (err) {
+    console.error('Portal session error:', err)
+    res.status(500).json({ error: 'Failed to create portal session' })
+  }
+})
+
+// Cancel subscription (sets cancel_at_period_end on Stripe)
+app.post('/api/subscription/cancel', authenticateToken, async (req, res) => {
+  try {
+    const userResult = await query('SELECT stripe_subscription_id FROM users WHERE id = $1', [req.user.userId])
+    const subId = userResult.rows[0]?.stripe_subscription_id
+    if (!subId) return res.status(400).json({ error: 'No active subscription' })
+
+    // Tell Stripe to cancel at end of current period (user keeps access until then)
+    await stripe.subscriptions.update(subId, { cancel_at_period_end: true })
+
+    // Clear local renew date
+    await execute('UPDATE users SET subscription_renew_date = NULL WHERE id = $1', [req.user.userId])
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error('Cancel subscription error:', err)
+    res.status(500).json({ error: 'Failed to cancel subscription' })
   }
 })
 
@@ -917,6 +1105,8 @@ execute(`
 execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS eula_accepted BOOLEAN DEFAULT FALSE').catch(() => {})
 execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS eula_version VARCHAR(20)').catch(() => {})
 execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS eula_accepted_at TIMESTAMPTZ').catch(() => {})
+execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255)').catch(() => {})
+execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(255)').catch(() => {})
 
 // ── EULA ────────────────────────────────────────────────────────────────────
 

@@ -194,35 +194,130 @@ export default function DroppedPinPanel() {
           </div>
         </div>
 
-        <div className="px-4 py-3 space-y-2.5">
-          {/* Context-aware weather measurements */}
-          {effectiveCurrent && (
-            <div className="space-y-2">
-              {/* Forecast hour label */}
-              {forecastEntry && selectedForecastHour > 0 && (
-                <div className="text-[10px] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded px-2 py-1 text-center">
-                  Forecast: {new Date(forecastEntry.time).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}
-                </div>
+        <div className="px-4 py-3 space-y-2">
+          {/* Forecast hour label */}
+          {forecastEntry && selectedForecastHour > 0 && (
+            <div className="text-[10px] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded px-2 py-1 text-center">
+              Forecast: {new Date(forecastEntry.time).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}
+            </div>
+          )}
+
+          {/* Coordinates + Depth — always visible */}
+          <div className="flex gap-1.5">
+            <div className="flex-1 bg-ocean-800 rounded-lg px-3 py-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-cyan-300 tabular-nums">
+                  {lat.toFixed(6)}°, {lng.toFixed(6)}°
+                </span>
+                <CopyButton text={decimalStr} />
+              </div>
+            </div>
+            <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5 flex-shrink-0">
+              {depthLoading ? (
+                <div className="w-3 h-3 border border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+              ) : depthFt != null ? (
+                <span className="text-[10px] font-semibold text-cyan-300 font-mono">{depthFt.toLocaleString()}'</span>
+              ) : (
+                <span className="text-[10px] text-slate-600">—</span>
               )}
-              {/* Conditions summary — hidden on mobile */}
-              <div className="hidden md:flex items-center justify-between bg-ocean-800 rounded-lg px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{wmo?.icon}</span>
-                  <div>
-                    <span className="text-lg font-bold text-slate-100 font-mono">{Math.round(effectiveCurrent.temperature)}°F</span>
-                    <span className="text-xs text-slate-500 ml-1">{wmo?.label}</span>
+            </div>
+          </div>
+
+          {/* Weather summary */}
+          {effectiveCurrent && (
+            <div className="flex items-center justify-between bg-ocean-800 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">{wmo?.icon}</span>
+                <span className="text-sm font-bold text-slate-100 font-mono">{Math.round(effectiveCurrent.temperature)}°F</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg width="12" height="12" viewBox="0 0 10 10" style={{ transform: `rotate(${effectiveCurrent.windDirection + 180}deg)` }}>
+                  <polygon points="5,0 3,8 5,6 7,8" fill="#06b6d4" />
+                </svg>
+                <span className="text-xs font-semibold text-slate-200 font-mono">{Math.round(effectiveCurrent.windSpeed)}</span>
+                <span className="text-[10px] text-slate-500">mph</span>
+                {effectiveCurrent.windGusts > effectiveCurrent.windSpeed + 5 && (
+                  <span className="text-[10px] text-amber-400 font-mono">G{Math.round(effectiveCurrent.windGusts)}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Marine data — horizontal scroll strip on mobile, grid on desktop */}
+          {showMarine && marineNow && (
+            <>
+              {/* Section label */}
+              <div className="text-[9px] text-slate-500 uppercase tracking-wider px-1">Marine Conditions</div>
+
+              {/* Mobile: horizontal scroll cards */}
+              <div className="md:hidden overflow-x-auto -mx-4 px-4 pb-1">
+                <div className="flex gap-2 min-w-max">
+                  {/* Combined Waves */}
+                  <div className="bg-ocean-800 rounded-lg px-3 py-2 min-w-[130px]">
+                    <div className="text-[9px] text-slate-500 uppercase mb-0.5">Waves</div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-sm font-bold text-slate-100 font-mono">{marineNow.waveHeight.toFixed(1)}</span>
+                      <span className="text-[10px] text-slate-500">ft</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">{marineNow.wavePeriod.toFixed(0)}s {degreesToCardinal(marineNow.waveDirection)}</div>
+                    {seaState && (
+                      <span className={`inline-block mt-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                        seaState.state <= 2 ? 'bg-emerald-500/20 text-emerald-400' :
+                        seaState.state <= 4 ? 'bg-amber-500/20 text-amber-400' :
+                        'bg-red-500/20 text-red-400'
+                      }`}>{seaState.label}</span>
+                    )}
+                  </div>
+
+                  {/* Swell */}
+                  <div className="bg-ocean-800 rounded-lg px-3 py-2 min-w-[120px]">
+                    <div className="text-[9px] text-slate-500 uppercase mb-0.5">Swell</div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-sm font-bold text-slate-100 font-mono">{marineNow.swellHeight.toFixed(1)}</span>
+                      <span className="text-[10px] text-slate-500">ft</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">{marineNow.swellPeriod.toFixed(0)}s {degreesToCardinal(marineNow.swellDirection)}</div>
+                  </div>
+
+                  {/* Wind Waves */}
+                  <div className="bg-ocean-800 rounded-lg px-3 py-2 min-w-[120px]">
+                    <div className="text-[9px] text-slate-500 uppercase mb-0.5">Wind Waves</div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-sm font-bold text-slate-100 font-mono">{marineNow.windWaveHeight.toFixed(1)}</span>
+                      <span className="text-[10px] text-slate-500">ft</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">{marineNow.windWavePeriod.toFixed(0)}s {degreesToCardinal(marineNow.windWaveDirection)}</div>
+                  </div>
+
+                  {/* SST */}
+                  <div className="bg-ocean-800 rounded-lg px-3 py-2 min-w-[100px]">
+                    <div className="text-[9px] text-slate-500 uppercase mb-0.5">SST</div>
+                    <span className="text-sm font-bold text-cyan-300 font-mono">{Math.round(marineNow.seaSurfaceTemp)}°F</span>
+                  </div>
+
+                  {/* Current */}
+                  <div className="bg-ocean-800 rounded-lg px-3 py-2 min-w-[120px]">
+                    <div className="text-[9px] text-slate-500 uppercase mb-0.5">Current</div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-sm font-bold text-slate-100 font-mono">{marineNow.oceanCurrentSpeed.toFixed(1)}</span>
+                      <span className="text-[10px] text-slate-500">kt</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">{degreesToCardinal(marineNow.oceanCurrentDirection)}</div>
                   </div>
                 </div>
               </div>
 
-              {/* Mobile compact view — wave height, wind, gusts only */}
-              <div className="md:hidden space-y-1.5">
-                {showMarine && (
-                  <div className="flex items-center justify-between bg-ocean-800 rounded-lg px-3 py-2">
+              {/* Desktop: compact grid */}
+              <div className="hidden md:block space-y-1.5">
+                {/* Waves row */}
+                <div className="bg-ocean-800 rounded-lg px-3 py-2">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-[10px] text-slate-500 uppercase">Waves</div>
-                      <span className="text-sm font-semibold text-slate-200 font-mono">{marineNow.waveHeight.toFixed(1)} ft</span>
-                      <span className="text-xs text-slate-500 ml-1">{marineNow.wavePeriod.toFixed(0)}s</span>
+                      <div className="text-[9px] text-slate-500 uppercase">Combined Waves</div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-sm font-bold text-slate-100 font-mono">{marineNow.waveHeight.toFixed(1)} ft</span>
+                        <span className="text-xs text-slate-400">{marineNow.wavePeriod.toFixed(0)}s from {degreesToCardinal(marineNow.waveDirection)}</span>
+                      </div>
                     </div>
                     {seaState && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
@@ -232,166 +327,57 @@ export default function DroppedPinPanel() {
                       }`}>{seaState.label}</span>
                     )}
                   </div>
+                </div>
+
+                {/* Swell + Wind Waves side by side */}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
+                    <div className="text-[9px] text-slate-500 uppercase">Swell</div>
+                    <div className="text-xs font-semibold text-slate-200 font-mono">{marineNow.swellHeight.toFixed(1)} ft @ {marineNow.swellPeriod.toFixed(0)}s</div>
+                    <div className="text-[10px] text-slate-500">{degreesToCardinal(marineNow.swellDirection)}</div>
+                  </div>
+                  <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
+                    <div className="text-[9px] text-slate-500 uppercase">Wind Waves</div>
+                    <div className="text-xs font-semibold text-slate-200 font-mono">{marineNow.windWaveHeight.toFixed(1)} ft @ {marineNow.windWavePeriod.toFixed(0)}s</div>
+                    <div className="text-[10px] text-slate-500">{degreesToCardinal(marineNow.windWaveDirection)}</div>
+                  </div>
+                </div>
+
+                {/* SST + Current side by side */}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
+                    <div className="text-[9px] text-slate-500 uppercase">Sea Surface Temp</div>
+                    <span className="text-xs font-semibold text-cyan-300 font-mono">{Math.round(marineNow.seaSurfaceTemp)}°F</span>
+                  </div>
+                  <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
+                    <div className="text-[9px] text-slate-500 uppercase">Current</div>
+                    <div className="text-xs font-semibold text-slate-200 font-mono">{marineNow.oceanCurrentSpeed.toFixed(1)} kt {degreesToCardinal(marineNow.oceanCurrentDirection)}</div>
+                  </div>
+                </div>
+
+                {/* Wind details */}
+                {effectiveCurrent && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
+                      <div className="text-[9px] text-slate-500 uppercase">Wind</div>
+                      <div className="flex items-center gap-1">
+                        <svg width="10" height="10" viewBox="0 0 10 10" style={{ transform: `rotate(${effectiveCurrent.windDirection + 180}deg)` }}>
+                          <polygon points="5,0 3,8 5,6 7,8" fill="#06b6d4" />
+                        </svg>
+                        <span className="text-xs font-semibold text-slate-200 font-mono">{Math.round(effectiveCurrent.windSpeed)} mph</span>
+                        <span className="text-[10px] text-slate-500">{degreesToCardinal(effectiveCurrent.windDirection)}</span>
+                      </div>
+                      {beaufort && <div className="text-[10px] text-slate-500">{beaufort.label}</div>}
+                    </div>
+                    <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
+                      <div className="text-[9px] text-slate-500 uppercase">Gusts</div>
+                      <span className="text-xs font-semibold text-amber-400 font-mono">{Math.round(effectiveCurrent.windGusts)} mph</span>
+                    </div>
+                  </div>
                 )}
-                <div className="flex gap-1.5">
-                  <div className="flex-1 bg-ocean-800 rounded-lg px-3 py-2">
-                    <div className="text-[10px] text-slate-500 uppercase">Wind</div>
-                    <div className="flex items-center gap-1">
-                      <svg width="12" height="12" viewBox="0 0 10 10" style={{ transform: `rotate(${effectiveCurrent.windDirection + 180}deg)` }}>
-                        <polygon points="5,0 3,8 5,6 7,8" fill="#06b6d4" />
-                      </svg>
-                      <span className="text-sm font-semibold text-slate-200 font-mono">{Math.round(effectiveCurrent.windSpeed)}</span>
-                      <span className="text-[10px] text-slate-500">mph {degreesToCardinal(effectiveCurrent.windDirection)}</span>
-                    </div>
-                  </div>
-                  <div className="flex-1 bg-ocean-800 rounded-lg px-3 py-2">
-                    <div className="text-[10px] text-slate-500 uppercase">Gusts</div>
-                    <span className="text-sm font-semibold text-amber-400 font-mono">{Math.round(effectiveCurrent.windGusts)} mph</span>
-                  </div>
-                </div>
               </div>
-
-              {/* Desktop full view — Wind data */}
-              {(showWind || showGeneral) && (
-                <div className="hidden md:block bg-ocean-800 rounded-lg px-3 py-2">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Wind</div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <svg width="14" height="14" viewBox="0 0 10 10" style={{ transform: `rotate(${effectiveCurrent.windDirection + 180}deg)` }}>
-                        <polygon points="5,0 3,8 5,6 7,8" fill="#06b6d4" />
-                      </svg>
-                      <span className="text-sm font-semibold text-slate-200 font-mono">
-                        {Math.round(effectiveCurrent.windSpeed)} mph
-                      </span>
-                      <span className="text-xs text-slate-500">{degreesToCardinal(effectiveCurrent.windDirection)}</span>
-                    </div>
-                    {beaufort && (
-                      <span className="text-[10px] text-slate-400">
-                        {beaufort.label} (F{beaufort.force})
-                      </span>
-                    )}
-                  </div>
-                  {effectiveCurrent.windGusts > effectiveCurrent.windSpeed + 5 && (
-                    <div className="text-xs text-amber-400 mt-0.5">
-                      Gusts: {Math.round(effectiveCurrent.windGusts)} mph
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Desktop: Marine / Wave data */}
-              {showMarine && (
-                <div className="hidden md:block bg-ocean-800 rounded-lg px-3 py-2">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Waves</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-slate-200 font-mono">
-                      {marineNow.waveHeight.toFixed(1)} ft
-                    </span>
-                    {seaState && (
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                        seaState.state <= 2 ? 'bg-emerald-500/20 text-emerald-400' :
-                        seaState.state <= 4 ? 'bg-amber-500/20 text-amber-400' :
-                        'bg-red-500/20 text-red-400'
-                      }`}>
-                        {seaState.label}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-400 mt-0.5">
-                    {marineNow.wavePeriod.toFixed(0)}s period from {degreesToCardinal(marineNow.waveDirection)}
-                  </div>
-                  <div className="flex gap-3 mt-1 text-[10px] text-slate-500">
-                    <span>Swell: {marineNow.swellHeight.toFixed(1)} ft @ {marineNow.swellPeriod.toFixed(0)}s</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Desktop: SST */}
-              {showSST && marineNow && (
-                <div className="hidden md:block bg-ocean-800 rounded-lg px-3 py-2">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Sea Surface Temp</div>
-                  <span className="text-sm font-semibold text-slate-200 font-mono">
-                    {Math.round(marineNow.seaSurfaceTemp)}°F
-                  </span>
-                </div>
-              )}
-
-              {/* Desktop: Ocean currents */}
-              {showCurrents && marineNow && (
-                <div className="hidden md:block bg-ocean-800 rounded-lg px-3 py-2">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Ocean Current</div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-200 font-mono">
-                      {marineNow.oceanCurrentSpeed.toFixed(1)} kt
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      toward {degreesToCardinal(marineNow.oceanCurrentDirection)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Desktop: General extras */}
-              {showGeneral && (
-                <div className="hidden md:grid grid-cols-2 gap-1.5">
-                  <div className="bg-ocean-800 rounded-lg px-2 py-1.5">
-                    <div className="text-[9px] text-slate-500 uppercase">Pressure</div>
-                    <div className="text-xs font-semibold text-slate-300 font-mono">{effectiveCurrent.pressure.toFixed(0)} mb</div>
-                  </div>
-                  <div className="bg-ocean-800 rounded-lg px-2 py-1.5">
-                    <div className="text-[9px] text-slate-500 uppercase">Humidity</div>
-                    <div className="text-xs font-semibold text-slate-300 font-mono">{effectiveCurrent.humidity}%</div>
-                  </div>
-                  <div className="bg-ocean-800 rounded-lg px-2 py-1.5">
-                    <div className="text-[9px] text-slate-500 uppercase">Visibility</div>
-                    <div className="text-xs font-semibold text-slate-300 font-mono">{effectiveCurrent.visibility.toFixed(1)} mi</div>
-                  </div>
-                  <div className="bg-ocean-800 rounded-lg px-2 py-1.5">
-                    <div className="text-[9px] text-slate-500 uppercase">Clouds</div>
-                    <div className="text-xs font-semibold text-slate-300 font-mono">{effectiveCurrent.cloudCover}%</div>
-                  </div>
-                </div>
-              )}
-            </div>
+            </>
           )}
-
-          {/* Ocean Depth */}
-          <div className="bg-ocean-800 rounded-lg px-3 py-2">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Ocean Depth</div>
-            {depthLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 border border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
-                <span className="text-xs text-slate-500">Fetching...</span>
-              </div>
-            ) : depthFt != null ? (
-              <span className="text-sm font-semibold text-cyan-300 font-mono">{depthFt.toLocaleString()} ft</span>
-            ) : (
-              <span className="text-xs text-slate-600">Land / no data</span>
-            )}
-          </div>
-
-          {/* Coordinates */}
-          <div>
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Coordinates</p>
-            <div className="flex items-center justify-between bg-ocean-800 rounded-lg px-3 py-1.5">
-              <span className="text-xs font-mono text-cyan-300 tabular-nums">
-                {lat.toFixed(6)}°, {lng.toFixed(6)}°
-              </span>
-              <CopyButton text={decimalStr} />
-            </div>
-          </div>
-
-          <div>
-            <div className="bg-ocean-800 rounded-lg px-3 py-1.5">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <p className="text-[10px] font-mono text-slate-400 tabular-nums">{dmsLat}</p>
-                  <p className="text-[10px] font-mono text-slate-400 tabular-nums">{dmsLng}</p>
-                </div>
-                <CopyButton text={dmsStr} />
-              </div>
-            </div>
-          </div>
 
           {/* Quick actions */}
           <div className="flex gap-2 pt-0.5">
@@ -404,10 +390,10 @@ export default function DroppedPinPanel() {
               Google Maps
             </a>
             <button
-              onClick={() => navigator.clipboard.writeText(`${decimalStr}\n${dmsStr}`)}
+              onClick={() => navigator.clipboard.writeText(decimalStr)}
               className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-ocean-700 hover:bg-ocean-600 text-xs text-slate-300 hover:text-slate-100 transition-colors border border-ocean-600"
             >
-              Copy All
+              Copy Coords
             </button>
           </div>
         </div>

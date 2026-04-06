@@ -4,7 +4,7 @@ import { useMapStore } from '../../store/mapStore'
 import { useWeatherStore } from '../../store/weatherStore'
 import { useAuthStore } from '../../store/authStore'
 import { formatCoords, cn } from '../../lib/utils'
-import { requestPasswordReset, resendVerificationCode, deactivateAccount } from '../../lib/apiClient'
+import { requestPasswordReset, resendVerificationCode, deactivateAccount, cancelSubscription, createCheckoutSession, createPortalSession } from '../../lib/apiClient'
 import SearchBar from './SearchBar'
 
 interface HeaderProps {
@@ -14,7 +14,7 @@ interface HeaderProps {
 // ── Account Modal ──────────────────────────────────────────────────────────
 
 function AccountModal({ user, onLogout, onClose }: {
-  user: { email: string; displayName?: string; avatarUrl?: string; emailVerified?: boolean }
+  user: { email: string; displayName?: string; avatarUrl?: string; emailVerified?: boolean; isPremium?: boolean; subscriptionRenewDate?: string | null }
   onLogout: () => void
   onClose: () => void
 }) {
@@ -23,6 +23,8 @@ function AccountModal({ user, onLogout, onClose }: {
   const [resetState, setResetState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [resetMsg, setResetMsg] = useState('')
   const [deactivateStep, setDeactivateStep] = useState<'idle' | 'confirm' | 'processing' | 'done'>('idle')
+  const [cancelState, setCancelState] = useState<'idle' | 'confirm' | 'cancelling' | 'done'>('idle')
+  const checkAuth = useAuthStore((s) => s.checkAuth)
 
   const initials = (user.displayName || user.email)
     .split(/[\s@]/).filter(Boolean).slice(0, 2).map((s) => s[0].toUpperCase()).join('')
@@ -58,34 +60,117 @@ function AccountModal({ user, onLogout, onClose }: {
             </div>
           </div>
 
-          {/* Upgrade to Premium */}
-          <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-ocean-800/80 to-cyan-500/10 p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-slate-200">Upgrade to Premium</p>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  Unlimited spot imports, advanced radar, trip logging, and priority satellite data.
-                </p>
-                <a
-                  href="https://buy.stripe.com/eVq4gy9or2wgemS6eP8AE00"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-400 hover:to-amber-500 transition-all shadow-lg shadow-amber-500/20"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          {/* Subscription section */}
+          {user.isPremium ? (
+            <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-ocean-800/80 to-cyan-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                   </svg>
-                  Upgrade Now
-                </a>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-200">Premium Member</p>
+                  {user.subscriptionRenewDate ? (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Auto-renews on{' '}
+                      <span className="text-slate-300 font-medium">
+                        {new Date(user.subscriptionRenewDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-500 mt-1">Auto-renew is off</p>
+                  )}
+
+                  {/* Manage billing via Stripe Portal */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { url } = await createPortalSession()
+                        if (url) window.location.href = url
+                      } catch { /* no portal available */ }
+                    }}
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors mt-2 underline underline-offset-2"
+                  >
+                    Manage billing
+                  </button>
+
+                  {/* Cancel / confirm */}
+                  {user.subscriptionRenewDate && cancelState === 'idle' && (
+                    <button
+                      onClick={() => setCancelState('confirm')}
+                      className="text-[10px] text-slate-600 hover:text-red-400 transition-colors mt-1 underline underline-offset-2"
+                    >
+                      Cancel auto-renew
+                    </button>
+                  )}
+                  {cancelState === 'confirm' && (
+                    <div className="mt-3 bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-2">
+                      <p className="text-xs text-slate-400">Your premium access will remain active until the current billing period ends. Are you sure?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setCancelState('idle')} className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-ocean-800 text-slate-400 hover:text-slate-200 hover:bg-ocean-700 border border-ocean-700 transition-all">
+                          Keep
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setCancelState('cancelling')
+                            try {
+                              await cancelSubscription()
+                              setCancelState('done')
+                              checkAuth()
+                            } catch { setCancelState('idle') }
+                          }}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-red-400 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 transition-all"
+                        >
+                          Cancel Renew
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {cancelState === 'cancelling' && (
+                    <div className="mt-3 text-center">
+                      <div className="w-4 h-4 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto" />
+                    </div>
+                  )}
+                  {cancelState === 'done' && (
+                    <p className="text-xs text-emerald-400 mt-2">Auto-renew cancelled.</p>
+                  )}
+                </div>
               </div>
+              <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-emerald-500/10 blur-2xl" />
             </div>
-            <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-amber-500/10 blur-2xl" />
-          </div>
+          ) : (
+            <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-ocean-800/80 to-cyan-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-200">Upgrade to Premium</p>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Unlimited spot imports, advanced radar, trip logging, and priority satellite data.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { url } = await createCheckoutSession()
+                        if (url) window.location.href = url
+                      } catch { /* fallback */ }
+                    }}
+                    className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-400 hover:to-amber-500 transition-all shadow-lg shadow-amber-500/20"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Upgrade Now
+                  </button>
+                </div>
+              </div>
+              <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-amber-500/10 blur-2xl" />
+            </div>
+          )}
 
           {/* Email verification */}
           {!user.emailVerified && (

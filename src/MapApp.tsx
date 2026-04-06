@@ -22,6 +22,7 @@ import { useWeatherStore } from './store/weatherStore'
 import { useAuthStore } from './store/authStore'
 import { useUserSpotsStore } from './store/userSpotsStore'
 import useKeyboardShortcuts, { registerShortcutsModalOpener, unregisterShortcutsModalOpener } from './hooks/useKeyboardShortcuts'
+import UpgradeBanner from './components/Auth/UpgradeBanner'
 import { useEffect, useState, useCallback } from 'react'
 
 export default function MapApp() {
@@ -54,6 +55,7 @@ export default function MapApp() {
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-ocean-950">
       <Header onSettingsClick={() => setSettingsOpen(true)} />
       <EmailVerificationBanner />
+      <UpgradeBanner />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left sidebar — fishing/map layers */}

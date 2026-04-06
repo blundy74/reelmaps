@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWeatherStore } from '../../store/weatherStore'
 import { useAuthStore } from '../../store/authStore'
 import { useMapStore } from '../../store/mapStore'
-import { savePreferences, getPreferences, requestPasswordReset, resendVerificationCode, deactivateAccount } from '../../lib/apiClient'
+import { savePreferences, getPreferences, requestPasswordReset, resendVerificationCode, deactivateAccount, createCheckoutSession } from '../../lib/apiClient'
 import { cn } from '../../lib/utils'
 import type { BasemapId } from '../../types'
 import MarineConditions from './MarineConditions'
@@ -375,7 +375,7 @@ function AccountTab({ user, onLogout, onLogin, onRegister }: {
         {/* Premium upsell for non-logged-in users */}
         <div className="w-full max-w-xs border-t border-ocean-700 pt-4 mt-2">
           <a
-            href="https://buy.stripe.com/eVq4gy9or2wgemS6eP8AE00"
+            href="https://buy.stripe.com/6oUaEW3033Ak4Mi32D8AE01"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-semibold bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-400 hover:to-amber-500 transition-all shadow-lg shadow-amber-500/20"
@@ -423,17 +423,20 @@ function AccountTab({ user, onLogout, onLogin, onRegister }: {
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                 Unlimited spot imports, advanced radar, trip logging, and priority satellite data.
               </p>
-              <a
-                href="https://buy.stripe.com/eVq4gy9or2wgemS6eP8AE00"
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={async () => {
+                  try {
+                    const { url } = await createCheckoutSession()
+                    if (url) window.location.href = url
+                  } catch { /* ignore */ }
+                }}
                 className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-400 hover:to-amber-500 transition-all shadow-lg shadow-amber-500/20"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 Upgrade Now
-              </a>
+              </button>
             </div>
           </div>
           {/* Decorative glow */}

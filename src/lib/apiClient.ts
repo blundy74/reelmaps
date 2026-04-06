@@ -60,6 +60,7 @@ export interface AuthUser {
   avatarUrl?: string
   emailVerified?: boolean
   isPremium?: boolean
+  subscriptionRenewDate?: string | null
   eulaAccepted?: boolean
   eulaVersion?: string | null
 }
@@ -124,6 +125,18 @@ export async function resetPassword(email: string, code: string, newPassword: st
 
 export async function deactivateAccount(): Promise<{ deactivated: boolean }> {
   return request('/api/auth/deactivate', { method: 'POST' })
+}
+
+export async function cancelSubscription(): Promise<{ success: boolean }> {
+  return request('/api/subscription/cancel', { method: 'POST' })
+}
+
+export async function createCheckoutSession(): Promise<{ url: string }> {
+  return request('/api/subscription/checkout', { method: 'POST' })
+}
+
+export async function createPortalSession(): Promise<{ url: string }> {
+  return request('/api/subscription/portal', { method: 'POST' })
 }
 
 // ── EULA API ────────────────────────────────────────────────────────────────
