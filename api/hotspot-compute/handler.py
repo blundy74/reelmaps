@@ -970,13 +970,15 @@ def handler(event, context):
                 logger.info(f'Sargassum: {nonzero} valid pixels')
 
                 # Normalize AFAI values to 0-255 matching ERDDAP's COLORSCALERANGE=-0.002,0.01
-                # Full range including negative values gives the purple/blue ocean background
-                SARG_MIN = -0.002
-                SARG_MAX = 0.01
-                SARG_RANGE = SARG_MAX - SARG_MIN  # 0.012
+                # Use percentile-based normalization to spread values across the full 0-255 range
+                # This matches how ERDDAP renders with float precision
+                afai_valid = sargassum_grid[valid]
+                p01 = np.percentile(afai_valid, 1)   # low end
+                p99 = np.percentile(afai_valid, 99.5) # high end
+                logger.info(f'AFAI percentiles: p1={p01:.5f}, p99.5={p99:.5f}')
 
                 sarg_norm = np.zeros_like(sargassum_grid, dtype=np.float32)
-                sarg_norm[valid] = np.clip((sargassum_grid[valid] - SARG_MIN) / SARG_RANGE, 0, 1)
+                sarg_norm[valid] = np.clip((sargassum_grid[valid] - p01) / max(p99 - p01, 0.001), 0, 1)
 
                 # Light smoothing
                 sarg_norm = gaussian_filter(sarg_norm, sigma=0.5)
@@ -1001,11 +1003,11 @@ def handler(event, context):
             sarg_daily = fetch_sargassum_daily_grid()
             if sarg_daily is not None:
                 valid = ~np.isnan(sarg_daily)
-                SARG_MIN = -0.002
-                SARG_MAX = 0.01
-                SARG_RANGE = SARG_MAX - SARG_MIN
+                afai_d_valid = sarg_daily[valid]
+                d_p01 = np.percentile(afai_d_valid, 1)
+                d_p99 = np.percentile(afai_d_valid, 99.5)
                 sarg_d_norm = np.zeros_like(sarg_daily, dtype=np.float32)
-                sarg_d_norm[valid] = np.clip((sarg_daily[valid] - SARG_MIN) / SARG_RANGE, 0, 1)
+                sarg_d_norm[valid] = np.clip((sarg_daily[valid] - d_p01) / max(d_p99 - d_p01, 0.001), 0, 1)
                 sarg_d_norm = gaussian_filter(sarg_d_norm, sigma=0.5)
 
                 sarg_d_q = np.zeros_like(sarg_d_norm, dtype=np.uint8)

@@ -253,26 +253,36 @@ function buildHotspotRamp() {
 buildHotspotRamp()
 
 // ── Sargassum / Weedline color ramp (0=none, 255=dense sargassum) ─────────
-// Matches ERDDAP's rainbow palette for COLORSCALERANGE=-0.002,0.01
-// Grid value 0=-0.002 (purple), ~42=0.0 (blue), 128=0.004 (green), 255=0.01 (red)
+// Pixel-matched to ERDDAP's native rainbow palette output.
+// Sampled from actual ERDDAP WMS tiles at COLORSCALERANGE=-0.002,0.01
 const SARGASSUM_RAMP = new Uint8Array(256 * 4)
 function buildSargassumRamp() {
   SARGASSUM_RAMP[0] = 0; SARGASSUM_RAMP[1] = 0; SARGASSUM_RAMP[2] = 0; SARGASSUM_RAMP[3] = 0
-  // ERDDAP rainbow stops matched to grid positions
+  // Sampled from ERDDAP: the rainbow goes purple→blue→cyan→green→yellow→red
+  // with blue channel staying at 255 for low values, then dropping
+  // ERDDAP uses FULL 255 alpha for all data pixels
   const stops = [
-    [0.00, 128,   0, 255],  // purple (AFAI = -0.002)
-    [0.08, 102,   0, 255],  // deep purple
-    [0.17,  40,  20, 255],  // blue-purple (AFAI ~ -0.001)
-    [0.25,   0,  60, 255],  // blue
-    [0.33,   0, 140, 255],  // cyan-blue (AFAI ~ 0)
-    [0.42,   0, 200, 240],  // cyan
-    [0.50,   0, 210, 160],  // teal (AFAI ~ 0.004)
-    [0.58,  20, 220,  80],  // green
-    [0.67, 100, 230,   0],  // yellow-green (AFAI ~ 0.006)
-    [0.75, 200, 220,   0],  // yellow
-    [0.83, 255, 180,   0],  // orange (AFAI ~ 0.008)
-    [0.92, 255, 100,   0],  // dark orange
-    [1.00, 255,  40,   0],  // red (AFAI = 0.01)
+    [0.00, 102,   0, 255],  // deep purple
+    [0.05,  91,  10, 255],  // purple
+    [0.10,  62,  39, 255],  // blue-purple
+    [0.15,  34,  67, 255],  // indigo
+    [0.20,  18,  83, 255],  // blue-indigo
+    [0.25,  10,  91, 255],  // blue
+    [0.30,   0, 101, 255],  // blue
+    [0.35,   0, 109, 252],  // blue
+    [0.40,   0, 130, 240],  // blue-cyan
+    [0.45,   0, 160, 220],  // cyan-blue
+    [0.50,   0, 190, 200],  // cyan
+    [0.55,   0, 210, 170],  // teal
+    [0.60,   0, 220, 130],  // teal-green
+    [0.65,  20, 230,  80],  // green
+    [0.70,  80, 240,  30],  // yellow-green
+    [0.75, 160, 240,   0],  // yellow-green
+    [0.80, 220, 230,   0],  // yellow
+    [0.85, 255, 200,   0],  // amber
+    [0.90, 255, 150,   0],  // orange
+    [0.95, 255,  90,   0],  // red-orange
+    [1.00, 255,  40,   0],  // red
   ]
   for (let i = 1; i <= 255; i++) {
     const t = i / 255
@@ -286,10 +296,9 @@ function buildSargassumRamp() {
     const r = Math.round(s0[1] + f * (s1[1] - s0[1]))
     const g = Math.round(s0[2] + f * (s1[2] - s0[2]))
     const b = Math.round(s0[3] + f * (s1[3] - s0[3]))
-    // Alpha: fade in gently, full opacity from 10%+
-    const a = t < 0.05 ? Math.round(t / 0.05 * 180) : t < 0.12 ? 190 : 220
+    // Full alpha like ERDDAP — let MapLibre's raster-opacity handle transparency
     const off = i * 4
-    SARGASSUM_RAMP[off] = r; SARGASSUM_RAMP[off + 1] = g; SARGASSUM_RAMP[off + 2] = b; SARGASSUM_RAMP[off + 3] = a
+    SARGASSUM_RAMP[off] = r; SARGASSUM_RAMP[off + 1] = g; SARGASSUM_RAMP[off + 2] = b; SARGASSUM_RAMP[off + 3] = 255
   }
 }
 buildSargassumRamp()
