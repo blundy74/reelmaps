@@ -138,7 +138,7 @@ const LEGENDS: LegendDef[] = [
     title: 'Weedlines (7-day)',
     unit: 'AFAI',
     isWeatherOverlay: false,
-    gradient: 'linear-gradient(to right, rgba(0,0,0,0) 0%, #264653 15%, #2a9d8f 35%, #e9c46a 60%, #f4a261 80%, #e76f51 100%)',
+    gradient: 'linear-gradient(to right, #6600ff 0%, #0050ff 20%, #00dcc8 40%, #32dc32 60%, #f0c800 80%, #ff3c00 100%)',
     labels: [
       { value: 'None', position: '0%' },
       { value: 'Low', position: '30%' },
@@ -151,7 +151,7 @@ const LEGENDS: LegendDef[] = [
     title: 'Weedlines (Daily)',
     unit: 'AFAI',
     isWeatherOverlay: false,
-    gradient: 'linear-gradient(to right, rgba(0,0,0,0) 0%, #264653 15%, #2a9d8f 35%, #e9c46a 60%, #f4a261 80%, #e76f51 100%)',
+    gradient: 'linear-gradient(to right, #6600ff 0%, #0050ff 20%, #00dcc8 40%, #32dc32 60%, #f0c800 80%, #ff3c00 100%)',
     labels: [
       { value: 'None', position: '0%' },
       { value: 'Low', position: '30%' },

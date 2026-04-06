@@ -253,28 +253,40 @@ function buildHotspotRamp() {
 buildHotspotRamp()
 
 // ── Sargassum / Weedline color ramp (0=none, 255=dense sargassum) ─────────
-// Dark teal → green → yellow → orange → red
+// Vibrant rainbow: deep purple → blue → cyan → green → yellow → orange → red
+// Matches the colorful ERDDAP WMS palette
 const SARGASSUM_RAMP = new Uint8Array(256 * 4)
 function buildSargassumRamp() {
   SARGASSUM_RAMP[0] = 0; SARGASSUM_RAMP[1] = 0; SARGASSUM_RAMP[2] = 0; SARGASSUM_RAMP[3] = 0
+  // Color stops: [position 0-1, r, g, b]
+  const stops = [
+    [0.00, 102,   0, 255],  // deep purple
+    [0.10,  50,  20, 220],  // blue-purple
+    [0.20,   0,  80, 255],  // blue
+    [0.30,   0, 160, 255],  // cyan-blue
+    [0.40,   0, 220, 200],  // cyan
+    [0.50,   0, 200, 100],  // teal-green
+    [0.60,  50, 220,  50],  // green
+    [0.70, 160, 230,   0],  // yellow-green
+    [0.80, 240, 200,   0],  // yellow
+    [0.90, 255, 140,   0],  // orange
+    [1.00, 255,  60,   0],  // red
+  ]
   for (let i = 1; i <= 255; i++) {
     const t = i / 255
-    let r, g, b, a
-    if (t < 0.1) {
-      r = 38; g = 70; b = 83; a = Math.round(t * 10 * 180)
-    } else if (t < 0.3) {
-      const s = (t - 0.1) / 0.2
-      r = Math.round(38 + s * 4); g = Math.round(70 + s * 87); b = Math.round(83 + s * 60); a = 200
-    } else if (t < 0.5) {
-      const s = (t - 0.3) / 0.2
-      r = Math.round(42 + s * 191); g = Math.round(157 + s * 39); b = Math.round(143 - s * 37); a = 220
-    } else if (t < 0.7) {
-      const s = (t - 0.5) / 0.2
-      r = Math.round(233 + s * 11); g = Math.round(196 - s * 34); b = Math.round(106 - s * 9); a = 235
-    } else {
-      const s = (t - 0.7) / 0.3
-      r = Math.round(244 - s * 13); g = Math.round(162 - s * 50); b = Math.round(97 - s * 16); a = 250
+    // Find surrounding stops
+    let s0 = stops[0], s1 = stops[stops.length - 1]
+    for (let j = 0; j < stops.length - 1; j++) {
+      if (t >= stops[j][0] && t <= stops[j + 1][0]) {
+        s0 = stops[j]; s1 = stops[j + 1]; break
+      }
     }
+    const f = s1[0] === s0[0] ? 0 : (t - s0[0]) / (s1[0] - s0[0])
+    const r = Math.round(s0[1] + f * (s1[1] - s0[1]))
+    const g = Math.round(s0[2] + f * (s1[2] - s0[2]))
+    const b = Math.round(s0[3] + f * (s1[3] - s0[3]))
+    // Alpha: fade in at low values, full opacity above 15%
+    const a = t < 0.08 ? Math.round(t / 0.08 * 200) : t < 0.15 ? 200 : 230
     const off = i * 4
     SARGASSUM_RAMP[off] = r; SARGASSUM_RAMP[off + 1] = g; SARGASSUM_RAMP[off + 2] = b; SARGASSUM_RAMP[off + 3] = a
   }
