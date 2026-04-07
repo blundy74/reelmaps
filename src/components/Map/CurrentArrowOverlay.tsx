@@ -18,8 +18,8 @@ const SPEED_MAX_KMH = 5           // km/h — speeds above this are clamped
 const ARROW_HEAD_SIZE = 4         // arrowhead triangle size in pixels
 const FETCH_DEBOUNCE_MS = 1500    // debounce fetches on map move
 const DATA_TTL_MS = 10 * 60_000   // re-fetch every 10 minutes
-const GRID_RESOLUTION = 0.1       // degrees between sample points (~11km)
-const MAX_POINTS_PER_REQUEST = 1000
+const GRID_RESOLUTION = 0.25      // degrees between sample points (~28km)
+const MAX_POINTS_PER_REQUEST = 400
 
 const MARINE_API = 'https://marine-api.open-meteo.com/v1/marine'
 
