@@ -349,7 +349,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
   },
   {
     id: 'chlorophyll',
-    name: 'Chlorophyll-a',
+    name: 'Chlorophyll (Daily)',
     description: 'Phytoplankton / ocean color (VIIRS NOAA-20) — 1 km daily. High chlorophyll = productive water = baitfish = gamefish.',
     group: 'satellite',
     sourceType: 'raster-wms',

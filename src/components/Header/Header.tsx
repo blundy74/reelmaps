@@ -257,6 +257,19 @@ function AccountModal({ user, onLogout, onClose }: {
             </button>
           </div>
 
+          {/* Contact */}
+          <div className="border-t border-ocean-700 pt-4 pb-2">
+            <button
+              onClick={() => window.location.href = ['m','a','i','l','t','o',':','c','o','n','t','a','c','t','@','r','e','e','l','m','a','p','s','.','a','i'].join('')}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs text-slate-400 hover:text-cyan-400 hover:bg-ocean-800 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Contact Us
+            </button>
+          </div>
+
           {/* Delete account */}
           <div className="border-t border-ocean-700 pt-4">
             {deactivateStep === 'idle' && (

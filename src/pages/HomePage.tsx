@@ -785,8 +785,16 @@ function Footer() {
             <span className="hidden sm:inline">Weather: NOAA HRRR</span>
           </div>
 
-          <div className="text-xs text-slate-600">
-            &copy; {new Date().getFullYear()} ReelMaps. All rights reserved.
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.location.href = ['m','a','i','l','t','o',':','i','n','f','o','@','r','e','e','l','m','a','p','s','.','a','i'].join('')}
+              className="text-xs text-cyan-400/60 hover:text-cyan-400 transition-colors"
+            >
+              Contact Us
+            </button>
+            <span className="text-xs text-slate-600">
+              &copy; {new Date().getFullYear()} ReelMaps. All rights reserved.
+            </span>
           </div>
         </div>
       </div>
