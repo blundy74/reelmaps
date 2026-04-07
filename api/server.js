@@ -420,6 +420,7 @@ app.post('/api/subscription/checkout', authenticateToken, async (req, res) => {
       customer: customerId,
       mode: 'subscription',
       line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
+      allow_promotion_codes: true,
       success_url: `${APP_URL}/app?upgraded=true`,
       cancel_url: `${APP_URL}/app`,
       client_reference_id: user.id,
