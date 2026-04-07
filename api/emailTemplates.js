@@ -214,4 +214,63 @@ function getGoodbyeEmailHtml(displayName) {
   `)
 }
 
-module.exports = { getVerificationEmailHtml, getWelcomeEmailHtml, getGoodbyeEmailHtml }
+// ── Welcome to Premium email ──────────────────────────────────────────────
+
+function getPremiumWelcomeEmailHtml(displayName) {
+  const name = displayName || 'Captain'
+
+  function premiumFeature(icon, title, desc) {
+    return `
+    <tr><td style="padding:10px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="width:44px;vertical-align:top;padding-right:12px;">
+            <div style="width:40px;height:40px;background:linear-gradient(135deg,#92400e,#78350f);border-radius:10px;text-align:center;line-height:40px;font-size:18px;">${icon}</div>
+          </td>
+          <td style="vertical-align:top;">
+            <div style="font-size:14px;font-weight:600;color:${COLORS.textPrimary};margin-bottom:2px;">${title}</div>
+            <div style="font-size:13px;color:${COLORS.textSecondary};line-height:1.5;">${desc}</div>
+          </td>
+        </tr>
+      </table>
+    </td></tr>`
+  }
+
+  return layout(`
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:48px;margin-bottom:8px;">⭐</div>
+      <h1 style="font-size:22px;font-weight:700;color:#f59e0b;margin:0;">
+        Welcome to Premium, ${name}!
+      </h1>
+      <div style="font-size:14px;color:${COLORS.textSecondary};margin-top:8px;">
+        You now have full access to every feature ReelMaps offers.
+      </div>
+    </div>
+
+    <div style="background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(6,182,212,0.05));border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:20px;margin-bottom:24px;">
+      <div style="font-size:14px;color:${COLORS.textPrimary};font-weight:600;margin-bottom:12px;">Your Premium features are now unlocked:</div>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        ${premiumFeature('🛰️', 'Satellite Data Layers', 'NASA MUR SST at 1km resolution, chlorophyll-a, ocean currents, SSH anomaly, altimetry, true color imagery, and salinity.')}
+        ${premiumFeature('🎯', 'AI Fishing Hotspots', 'Proprietary algorithm scoring every square mile of ocean for fishing probability. Updated every 6 hours with inshore and offshore variants.')}
+        ${premiumFeature('🌿', 'Sargassum / Weedlines', 'Daily and 7-day satellite-detected weedline positions from NOAA AFAI. Find the rip lines where pelagics patrol.')}
+        ${premiumFeature('📍', 'Unlimited Spot Imports', 'Import thousands of fishing spots from CSV, GPX, and Garmin FIT files. Organize with custom icons.')}
+        ${premiumFeature('📅', 'Historical Satellite Data', 'Browse 6 months of satellite imagery, hotspot history, and sargassum data day by day.')}
+      </table>
+    </div>
+
+    <!-- CTA Button -->
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="text-align:center;padding:8px 0 16px;">
+        <a href="${APP_URL}/app" style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#d97706);color:#ffffff;font-size:14px;font-weight:600;padding:14px 36px;border-radius:8px;text-decoration:none;box-shadow:0 4px 12px rgba(245,158,11,0.3);">
+          Start Exploring →
+        </a>
+      </td></tr>
+    </table>
+
+    <div style="font-size:13px;color:${COLORS.textDim};line-height:1.6;text-align:center;">
+      Thank you for supporting ReelMaps. Your subscription helps us keep the satellites streaming and the algorithms running. Tight lines! 🐟
+    </div>
+  `)
+}
+
+module.exports = { getVerificationEmailHtml, getWelcomeEmailHtml, getGoodbyeEmailHtml, getPremiumWelcomeEmailHtml }

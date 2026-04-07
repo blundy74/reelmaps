@@ -24,7 +24,7 @@ const jwt = require('jsonwebtoken')
 const { v4: uuid } = require('uuid')
 const { query, execute } = require('./db.js')
 const { sendEmail } = require('./email.js')
-const { getVerificationEmailHtml, getWelcomeEmailHtml, getGoodbyeEmailHtml } = require('./emailTemplates.js')
+const { getVerificationEmailHtml, getWelcomeEmailHtml, getGoodbyeEmailHtml, getPremiumWelcomeEmailHtml } = require('./emailTemplates.js')
 
 const Stripe = require('stripe')
 
@@ -80,6 +80,18 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
           }
 
           console.log(`User ${userId} upgraded to premium (customer: ${customerId}, subscription: ${subscriptionId})`)
+
+          // Send Welcome to Premium email
+          try {
+            const userRow = await query('SELECT email, display_name FROM users WHERE id = $1', [userId])
+            if (userRow.rows.length > 0) {
+              const { email, display_name } = userRow.rows[0]
+              await sendEmail(email, 'Welcome to ReelMaps Premium! ⭐', getPremiumWelcomeEmailHtml(display_name))
+              console.log(`Premium welcome email sent to ${email}`)
+            }
+          } catch (emailErr) {
+            console.error('Failed to send premium welcome email:', emailErr.message)
+          }
         }
         break
       }
