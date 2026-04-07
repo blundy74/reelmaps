@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useNavigate } from 'react-router-dom'
 import AuthModal from '../components/Auth/AuthModal'
+import ContactModal from '../components/ui/ContactModal'
 
 // ── Hero background videos (looping MP4s from Pexels) ───────────────────────
 const HERO_VIDEOS = [
@@ -579,7 +580,7 @@ const FAQ_ITEMS = [
     questions: [
       {
         q: 'How does the AI hotspot algorithm work?',
-        a: 'The hotspot algorithm composites multiple satellite data sources using edge detection (Sobel operator) to find temperature breaks in SST, color breaks in chlorophyll, steep gradients in bathymetry, and eddy edges in sea surface height. Each pixel is scored: SST edges (35% weight), chlorophyll edges (25%), bathymetric features (18%), current/eddy edges (12%), and species temperature match (10%). Co-located features get non-linear bonuses — an SST break on the shelf edge with a color change is scored much higher than any single factor alone.',
+        a: 'Our proprietary algorithm analyzes multiple satellite data sources to detect the ocean features that concentrate gamefish — temperature breaks in SST, color breaks in chlorophyll, bathymetric structure like shelf edges and canyons, and current/eddy boundaries from sea surface height. Each factor is weighted based on decades of fishing science, and co-located features receive significant non-linear bonuses. When multiple conditions converge in one area, the score jumps dramatically — because that\'s where the fish are.',
       },
       {
         q: 'How often are hotspots updated?',
@@ -765,6 +766,7 @@ function FAQSection() {
 }
 
 function Footer() {
+  const [contactOpen, setContactOpen] = useState(false)
   return (
     <footer className="bg-ocean-950 border-t border-ocean-800 py-12">
       <div className="max-w-7xl mx-auto px-6">
@@ -787,7 +789,7 @@ function Footer() {
 
           <div className="flex items-center gap-4">
             <button
-              onClick={() => window.location.href = ['m','a','i','l','t','o',':','i','n','f','o','@','r','e','e','l','m','a','p','s','.','a','i'].join('')}
+              onClick={() => setContactOpen(true)}
               className="text-xs text-cyan-400/60 hover:text-cyan-400 transition-colors"
             >
               Contact Us
@@ -796,6 +798,7 @@ function Footer() {
               &copy; {new Date().getFullYear()} ReelMaps. All rights reserved.
             </span>
           </div>
+          <ContactModal open={contactOpen} onClose={() => setContactOpen(false)} />
         </div>
       </div>
     </footer>

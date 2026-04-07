@@ -490,6 +490,52 @@ app.post('/api/subscription/cancel', authenticateToken, async (req, res) => {
   }
 })
 
+// ── Contact Form ────────────────────────────────────────────────────────────
+
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { name, email, subject, message } = req.body
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ error: 'All fields are required' })
+    }
+
+    // Rate limit: max 3 messages per email per hour
+    // (simple in-memory, resets on Lambda cold start)
+    const now = Date.now()
+    if (!global._contactRateLimit) global._contactRateLimit = {}
+    const key = email.toLowerCase()
+    const history = global._contactRateLimit[key] || []
+    const recent = history.filter(t => now - t < 3600000)
+    if (recent.length >= 3) {
+      return res.status(429).json({ error: 'Too many messages. Please try again later.' })
+    }
+    global._contactRateLimit[key] = [...recent, now]
+
+    // Send to admin email
+    const adminEmail = 'blundywhat@gmail.com'
+    const html = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#0c1e30;color:#e2e8f0;border-radius:12px;">
+        <h2 style="color:#06b6d4;margin-bottom:16px;">New Contact Form Message</h2>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:8px 0;color:#94a3b8;width:80px;">From:</td><td style="padding:8px 0;color:#e2e8f0;"><strong>${name}</strong> &lt;${email}&gt;</td></tr>
+          <tr><td style="padding:8px 0;color:#94a3b8;">Subject:</td><td style="padding:8px 0;color:#e2e8f0;"><strong>${subject}</strong></td></tr>
+        </table>
+        <div style="margin-top:16px;padding:16px;background:#122540;border-radius:8px;border:1px solid #183050;">
+          <p style="color:#e2e8f0;line-height:1.6;white-space:pre-wrap;margin:0;">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+        </div>
+        <p style="margin-top:16px;font-size:12px;color:#64748b;">Reply directly to this email to respond to ${name}.</p>
+      </div>
+    `
+
+    await sendEmail(adminEmail, `[ReelMaps Contact] ${subject}`, html)
+    console.log(`Contact form: ${name} <${email}> — ${subject}`)
+    res.json({ sent: true })
+  } catch (err) {
+    console.error('Contact form error:', err)
+    res.status(500).json({ error: 'Failed to send message' })
+  }
+})
+
 // ── Password Reset ──────────────────────────────────────────────────────────
 
 app.post('/api/auth/request-reset', async (req, res) => {

@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore'
 import { formatCoords, cn } from '../../lib/utils'
 import { requestPasswordReset, resendVerificationCode, deactivateAccount, cancelSubscription, createCheckoutSession, createPortalSession } from '../../lib/apiClient'
 import SearchBar from './SearchBar'
+import ContactModal from '../ui/ContactModal'
 
 interface HeaderProps {
   onSettingsClick?: () => void
@@ -24,6 +25,7 @@ function AccountModal({ user, onLogout, onClose }: {
   const [resetMsg, setResetMsg] = useState('')
   const [deactivateStep, setDeactivateStep] = useState<'idle' | 'confirm' | 'processing' | 'done'>('idle')
   const [cancelState, setCancelState] = useState<'idle' | 'confirm' | 'cancelling' | 'done'>('idle')
+  const [contactOpen, setContactOpen] = useState(false)
   const checkAuth = useAuthStore((s) => s.checkAuth)
 
   const initials = (user.displayName || user.email)
@@ -260,7 +262,7 @@ function AccountModal({ user, onLogout, onClose }: {
           {/* Contact */}
           <div className="border-t border-ocean-700 pt-4 pb-2">
             <button
-              onClick={() => window.location.href = ['m','a','i','l','t','o',':','c','o','n','t','a','c','t','@','r','e','e','l','m','a','p','s','.','a','i'].join('')}
+              onClick={() => setContactOpen(true)}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs text-slate-400 hover:text-cyan-400 hover:bg-ocean-800 transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,6 +270,7 @@ function AccountModal({ user, onLogout, onClose }: {
               </svg>
               Contact Us
             </button>
+            <ContactModal open={contactOpen} onClose={() => setContactOpen(false)} />
           </div>
 
           {/* Delete account */}
