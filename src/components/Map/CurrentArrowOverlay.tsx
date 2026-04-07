@@ -18,8 +18,8 @@ const SPEED_MAX_KMH = 5           // km/h — speeds above this are clamped
 const ARROW_HEAD_SIZE = 4         // arrowhead triangle size in pixels
 const FETCH_DEBOUNCE_MS = 1500    // debounce fetches on map move
 const DATA_TTL_MS = 10 * 60_000   // re-fetch every 10 minutes
-const GRID_RESOLUTION = 0.25      // degrees between sample points (~28km)
 const MAX_POINTS_PER_REQUEST = 400
+const MAX_GRID_POINTS = 900       // max total grid points to keep URL short
 
 const MARINE_API = 'https://marine-api.open-meteo.com/v1/marine'
 
@@ -52,11 +52,18 @@ async function fetchCurrentGrid(
   const w = Math.max(-180, west - 0.5)
   const e = Math.min(180, east + 0.5)
 
-  // Build grid of lat/lng at GRID_RESOLUTION spacing
+  // Calculate adaptive grid resolution based on view size
+  const latSpan = n - s
+  const lngSpan = e - w
+  const maxPerAxis = Math.floor(Math.sqrt(MAX_GRID_POINTS))
+  const resolution = Math.max(0.2, Math.max(latSpan, lngSpan) / maxPerAxis)
+  const roundedRes = Math.round(resolution * 10) / 10 || 0.5
+
+  // Build grid
   const lats: number[] = []
   const lngs: number[] = []
-  for (let lat = s; lat <= n; lat += GRID_RESOLUTION) lats.push(Math.round(lat * 10) / 10)
-  for (let lng = w; lng <= e; lng += GRID_RESOLUTION) lngs.push(Math.round(lng * 10) / 10)
+  for (let lat = s; lat <= n; lat += roundedRes) lats.push(Math.round(lat * 10) / 10)
+  for (let lng = w; lng <= e; lng += roundedRes) lngs.push(Math.round(lng * 10) / 10)
 
   const totalPoints = lats.length * lngs.length
   if (totalPoints === 0) return null

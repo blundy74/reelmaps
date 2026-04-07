@@ -93,28 +93,29 @@ function AccountModal({ user, onLogout, onClose }: {
                     <p className="text-xs text-slate-500 mt-1">Active subscription</p>
                   )}
 
-                  {/* Manage billing via Stripe Portal */}
-                  <button
-                    onClick={async () => {
-                      try {
-                        const { url } = await createPortalSession()
-                        if (url) window.location.href = url
-                      } catch { /* no portal available */ }
-                    }}
-                    className="text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors mt-2 underline underline-offset-2"
-                  >
-                    Manage billing
-                  </button>
-
-                  {/* Downgrade — only show if not already cancelled */}
-                  {!user.subscriptionExpiresAt && cancelState === 'idle' && (
+                  {/* Manage billing + Cancel */}
+                  <div className="flex items-center gap-4 mt-2">
                     <button
-                      onClick={() => setCancelState('confirm')}
-                      className="text-[10px] text-slate-600 hover:text-red-400 transition-colors mt-1 underline underline-offset-2"
+                      onClick={async () => {
+                        try {
+                          const { url } = await createPortalSession()
+                          if (url) window.location.href = url
+                        } catch { /* no portal available */ }
+                      }}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors underline underline-offset-2"
                     >
-                      Cancel auto-renew
+                      Manage billing
                     </button>
-                  )}
+
+                    {!user.subscriptionExpiresAt && cancelState === 'idle' && (
+                      <button
+                        onClick={() => setCancelState('confirm')}
+                        className="text-[10px] text-slate-600 hover:text-red-400 transition-colors underline underline-offset-2"
+                      >
+                        Cancel auto-renew
+                      </button>
+                    )}
+                  </div>
                   {cancelState === 'confirm' && (
                     <div className="mt-3 bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-2">
                       <p className="text-xs text-slate-400">Your premium access will remain active until the end of your current billing period. After that, your account will revert to the free plan. Are you sure?</p>
