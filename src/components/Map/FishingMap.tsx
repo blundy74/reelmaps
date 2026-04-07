@@ -533,8 +533,11 @@ export default function FishingMap() {
         }
       }
 
-      // Always move fishing spot layers to the very top so they're never covered
-      const spotLayers = ['clusters', 'cluster-count', 'fishing-spots', 'fishing-spots-labels']
+      // Always move fishing spots and user spots to the very top so they're never covered by overlays
+      const spotLayers = [
+        'clusters', 'cluster-count', 'fishing-spots', 'fishing-spots-rigs', 'fishing-spots-fads', 'fishing-spots-labels',
+        'user-clusters', 'user-cluster-count', 'user-spots', 'user-spots-labels',
+      ]
       for (const id of spotLayers) {
         if (map.getLayer(id)) map.moveLayer(id)
       }

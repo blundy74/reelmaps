@@ -46,7 +46,10 @@ function removeHotspotLayer(map: maplibregl.Map, srcId: string, lyrId: string) {
 }
 
 function moveSpotLayersToTop(map: maplibregl.Map) {
-  for (const id of ['clusters', 'cluster-count', 'fishing-spots', 'fishing-spots-rigs', 'fishing-spots-fads', 'fishing-spots-labels']) {
+  for (const id of [
+    'clusters', 'cluster-count', 'fishing-spots', 'fishing-spots-rigs', 'fishing-spots-fads', 'fishing-spots-labels',
+    'user-clusters', 'user-cluster-count', 'user-spots', 'user-spots-labels',
+  ]) {
     if (map.getLayer(id)) map.moveLayer(id)
   }
 }

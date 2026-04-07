@@ -77,14 +77,14 @@ function AccountModal({ user, onLogout, onClose }: {
                   {/* Show expiration date if cancelled, otherwise show renewal date */}
                   {user.subscriptionExpiresAt ? (
                     <p className="text-xs text-amber-400 mt-1">
-                      Premium expires on{' '}
+                      Subscription expires on{' '}
                       <span className="font-medium">
                         {new Date(user.subscriptionExpiresAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                       </span>
                     </p>
                   ) : user.subscriptionRenewDate ? (
                     <p className="text-xs text-slate-400 mt-1">
-                      Auto-renews on{' '}
+                      Subscription renews on{' '}
                       <span className="text-slate-300 font-medium">
                         {new Date(user.subscriptionRenewDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                       </span>
