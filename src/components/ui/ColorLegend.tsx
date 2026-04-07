@@ -216,6 +216,38 @@ const LEGENDS: LegendDef[] = [
       { value: '10+', position: '100%' },
     ],
   },
+  // ── Wind & Wave overlays (from weather sidebar) ──────────────────────
+  {
+    layerId: 'wind',
+    title: 'Wind Speed',
+    unit: 'mph',
+    isWeatherOverlay: true,
+    gradient: 'linear-gradient(to right, #1e3c8e, #0097a7, #43a047, #b4d234, #fdd835, #fb8c00, #d32f2f, #ad1457)',
+    labels: [
+      { value: '0', position: '0%' },
+      { value: '5', position: '14%' },
+      { value: '10', position: '28%' },
+      { value: '15', position: '42%' },
+      { value: '20', position: '57%' },
+      { value: '30', position: '71%' },
+      { value: '40', position: '85%' },
+      { value: '50+', position: '100%' },
+    ],
+  },
+  {
+    layerId: 'waves',
+    title: 'Wave Height',
+    unit: 'ft',
+    isWeatherOverlay: true,
+    gradient: 'linear-gradient(to right, #e8f0fe, #b8d4f0, #7ab0e0, #4090cc, #1a70b8, #0c4a8e, #082e5c)',
+    labels: [
+      { value: '1', position: '0%' },
+      { value: '2', position: '20%' },
+      { value: '3', position: '40%' },
+      { value: '4', position: '60%' },
+      { value: '5+', position: '100%' },
+    ],
+  },
 ]
 
 export function ColorLegend({ forecastBarOpen = false }: { forecastBarOpen?: boolean }) {

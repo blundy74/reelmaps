@@ -2,8 +2,8 @@
  * CurrentArrowOverlay — renders ocean current arrows on a canvas overlay.
  *
  * Fetches current velocity and direction from Open-Meteo Marine API
- * (CORS-friendly, no proxy needed) and renders a grid of arrows
- * showing current direction and speed.
+ * (backed by CMEMS/HYCOM ocean model data). Dense grid sampling
+ * provides high-resolution current arrows at all zoom levels.
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react'
@@ -11,28 +11,25 @@ import type maplibregl from 'maplibre-gl'
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
-const ARROW_SPACING_PX = 52       // pixels between arrow grid points
-const ARROW_LENGTH_MIN = 10       // min arrow length (pixels)
-const ARROW_LENGTH_MAX = 34       // max arrow length (pixels)
-const SPEED_MAX_KMH = 6           // km/h — speeds above this are clamped
-const ARROW_HEAD_SIZE = 5         // arrowhead size in pixels
-const FETCH_DEBOUNCE_MS = 2500    // debounce grid fetches on map move
-const DATA_TTL_MS = 15 * 60_000   // re-fetch data every 15 minutes
-const MAX_POINTS = 400            // max grid points per request (Open-Meteo limit)
+const ARROW_SPACING_PX = 40       // pixels between arrows on screen
+const ARROW_LENGTH_MIN = 8        // min arrow length (pixels)
+const ARROW_LENGTH_MAX = 28       // max arrow length (pixels)
+const SPEED_MAX_KMH = 5           // km/h — speeds above this are clamped
+const ARROW_HEAD_SIZE = 4         // arrowhead triangle size in pixels
+const FETCH_DEBOUNCE_MS = 1500    // debounce fetches on map move
+const DATA_TTL_MS = 10 * 60_000   // re-fetch every 10 minutes
+const GRID_RESOLUTION = 0.1       // degrees between sample points (~11km)
+const MAX_POINTS_PER_REQUEST = 1000
 
 const MARINE_API = 'https://marine-api.open-meteo.com/v1/marine'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-interface CurrentPoint {
-  lat: number
-  lng: number
-  speed: number     // km/h
-  direction: number // degrees (meteorological: direction current is flowing TO)
-}
-
-interface CurrentData {
-  points: CurrentPoint[]
+interface CurrentGrid {
+  lats: number[]
+  lngs: number[]
+  speed: Float32Array  // row-major [lat][lng] in km/h
+  direction: Float32Array // degrees
   fetchedAt: number
   bounds: { south: number; north: number; west: number; east: number }
 }
@@ -45,154 +42,146 @@ interface Props {
 
 // ── Data fetching ───────────────────────────────────────────────────────────
 
-async function fetchCurrentData(
+async function fetchCurrentGrid(
   south: number, north: number, west: number, east: number,
   signal?: AbortSignal,
-): Promise<CurrentData | null> {
-  // Build a grid of lat/lng points within bounds
-  const latSpan = north - south
-  const lngSpan = east - west
+): Promise<CurrentGrid | null> {
+  // Pad bounds slightly
+  const s = Math.max(-80, south - 0.5)
+  const n = Math.min(80, north + 0.5)
+  const w = Math.max(-180, west - 0.5)
+  const e = Math.min(180, east + 0.5)
 
-  // Calculate grid resolution based on available points
-  const aspect = lngSpan / Math.max(latSpan, 0.1)
-  const nLat = Math.max(3, Math.min(20, Math.round(Math.sqrt(MAX_POINTS / aspect))))
-  const nLng = Math.max(3, Math.min(20, Math.round(nLat * aspect)))
-
-  const latStep = latSpan / (nLat - 1)
-  const lngStep = lngSpan / (nLng - 1)
-
+  // Build grid of lat/lng at GRID_RESOLUTION spacing
   const lats: number[] = []
   const lngs: number[] = []
+  for (let lat = s; lat <= n; lat += GRID_RESOLUTION) lats.push(Math.round(lat * 10) / 10)
+  for (let lng = w; lng <= e; lng += GRID_RESOLUTION) lngs.push(Math.round(lng * 10) / 10)
 
-  for (let i = 0; i < nLat; i++) {
-    for (let j = 0; j < nLng; j++) {
-      lats.push(parseFloat((south + i * latStep).toFixed(2)))
-      lngs.push(parseFloat((west + j * lngStep).toFixed(2)))
+  const totalPoints = lats.length * lngs.length
+  if (totalPoints === 0) return null
+
+  // Build all lat/lng pairs
+  const allLats: string[] = []
+  const allLngs: string[] = []
+  for (const lat of lats) {
+    for (const lng of lngs) {
+      allLats.push(lat.toFixed(1))
+      allLngs.push(lng.toFixed(1))
     }
   }
 
-  // Open-Meteo accepts comma-separated lat/lng arrays
-  const url = `${MARINE_API}?latitude=${lats.join(',')}&longitude=${lngs.join(',')}&current=ocean_current_velocity,ocean_current_direction`
+  // Fetch in batches if needed
+  const speedArr = new Float32Array(totalPoints)
+  const dirArr = new Float32Array(totalPoints)
+  let fetched = 0
 
-  try {
-    const res = await fetch(url, { signal })
-    if (!res.ok) return null
+  for (let offset = 0; offset < totalPoints; offset += MAX_POINTS_PER_REQUEST) {
+    const batchLats = allLats.slice(offset, offset + MAX_POINTS_PER_REQUEST)
+    const batchLngs = allLngs.slice(offset, offset + MAX_POINTS_PER_REQUEST)
 
-    const json = await res.json()
+    const url = `${MARINE_API}?latitude=${batchLats.join(',')}&longitude=${batchLngs.join(',')}&current=ocean_current_velocity,ocean_current_direction`
 
-    // Response is an array of point results
-    const results = Array.isArray(json) ? json : [json]
-    const points: CurrentPoint[] = []
+    try {
+      const res = await fetch(url, { signal })
+      if (!res.ok) continue
+      const json = await res.json()
+      const results = Array.isArray(json) ? json : [json]
 
-    for (let i = 0; i < results.length; i++) {
-      const r = results[i]
-      if (!r?.current) continue
-
-      const speed = r.current.ocean_current_velocity
-      const direction = r.current.ocean_current_direction
-
-      if (speed == null || direction == null) continue
-
-      points.push({
-        lat: r.latitude,
-        lng: r.longitude,
-        speed,
-        direction,
-      })
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i]
+        const spd = r?.current?.ocean_current_velocity
+        const dir = r?.current?.ocean_current_direction
+        if (spd != null && dir != null) {
+          speedArr[offset + i] = spd
+          dirArr[offset + i] = dir
+          fetched++
+        }
+      }
+    } catch {
+      if (signal?.aborted) return null
     }
+  }
 
-    if (!points.length) return null
+  if (fetched < 10) return null
 
-    return { points, fetchedAt: Date.now(), bounds: { south, north, west, east } }
-  } catch {
-    return null
+  return {
+    lats, lngs, speed: speedArr, direction: dirArr,
+    fetchedAt: Date.now(),
+    bounds: { south: s, north: n, west: e > w ? w : w, east: e },
   }
 }
 
 // ── Interpolation ───────────────────────────────────────────────────────────
 
-/**
- * Find the nearest current data points and interpolate speed/direction
- * using inverse-distance weighting.
- */
-function interpolateCurrent(
-  lat: number, lng: number, points: CurrentPoint[], maxDist: number,
-): { speed: number; direction: number } | null {
-  let totalWeight = 0
-  let speedSum = 0
-  let dxSum = 0
-  let dySum = 0
+function bilinearInterp(
+  lat: number, lng: number,
+  grid: CurrentGrid,
+  field: Float32Array,
+): number {
+  const { lats, lngs } = grid
+  if (lats.length < 2 || lngs.length < 2) return NaN
 
-  for (const p of points) {
-    const dlat = p.lat - lat
-    const dlng = p.lng - lng
-    const dist = Math.sqrt(dlat * dlat + dlng * dlng)
+  // Find surrounding lat indices
+  let li = 0
+  while (li < lats.length - 1 && lats[li + 1] < lat) li++
+  li = Math.max(0, Math.min(li, lats.length - 2))
 
-    if (dist > maxDist) continue
-    if (dist < 0.001) {
-      return { speed: p.speed, direction: p.direction }
-    }
+  let gi = 0
+  while (gi < lngs.length - 1 && lngs[gi + 1] < lng) gi++
+  gi = Math.max(0, Math.min(gi, lngs.length - 2))
 
-    const w = 1 / (dist * dist)
-    totalWeight += w
-    speedSum += p.speed * w
+  const latR = lats[li + 1] - lats[li]
+  const lngR = lngs[gi + 1] - lngs[gi]
+  const a = latR === 0 ? 0 : Math.max(0, Math.min(1, (lat - lats[li]) / latR))
+  const b = lngR === 0 ? 0 : Math.max(0, Math.min(1, (lng - lngs[gi]) / lngR))
 
-    // Decompose direction into components to average properly
-    const rad = (p.direction * Math.PI) / 180
-    dxSum += Math.sin(rad) * w
-    dySum += Math.cos(rad) * w
-  }
+  const nLng = lngs.length
+  const v00 = field[li * nLng + gi]
+  const v10 = field[(li + 1) * nLng + gi]
+  const v01 = field[li * nLng + (gi + 1)]
+  const v11 = field[(li + 1) * nLng + (gi + 1)]
 
-  if (totalWeight === 0) return null
+  if (v00 === 0 && v10 === 0 && v01 === 0 && v11 === 0) return 0
 
-  const avgSpeed = speedSum / totalWeight
-  const avgDir = ((Math.atan2(dxSum / totalWeight, dySum / totalWeight) * 180) / Math.PI + 360) % 360
-
-  return { speed: avgSpeed, direction: avgDir }
+  return v00 * (1 - a) * (1 - b) + v10 * a * (1 - b) + v01 * (1 - a) * b + v11 * a * b
 }
 
 // ── Arrow drawing ───────────────────────────────────────────────────────────
 
 function speedToColor(speedKmh: number): string {
   const t = Math.min(speedKmh / SPEED_MAX_KMH, 1)
-  // Cyan (slow) → Yellow (medium) → Red (fast)
-  if (t < 0.5) {
-    const s = t * 2
-    const r = Math.round(6 + s * 239)
-    const g = Math.round(182 + s * (220 - 182))
-    const b = Math.round(212 - s * 212)
-    return `rgb(${r},${g},${b})`
+  if (t < 0.3) {
+    const s = t / 0.3
+    return `rgba(6, ${Math.round(160 + s * 22)}, ${Math.round(212 - s * 12)}, ${0.6 + s * 0.2})`
   }
-  const s = (t - 0.5) * 2
-  const r = Math.round(245 - s * 10)
-  const g = Math.round(220 - s * 150)
-  const b = Math.round(0)
-  return `rgb(${r},${g},${b})`
+  if (t < 0.6) {
+    const s = (t - 0.3) / 0.3
+    return `rgba(${Math.round(6 + s * 234)}, ${Math.round(182 + s * 38)}, ${Math.round(200 - s * 200)}, 0.85)`
+  }
+  const s = (t - 0.6) / 0.4
+  return `rgba(${Math.round(240 + s * 15)}, ${Math.round(220 - s * 160)}, 0, ${0.9 + s * 0.1})`
 }
 
 function drawArrow(
   ctx: CanvasRenderingContext2D,
   x: number, y: number,
-  angleDeg: number,  // oceanographic: direction current flows TO (0=north, 90=east)
+  angleDeg: number,
   length: number,
   color: string,
-  alpha: number,
 ) {
   ctx.save()
-  ctx.globalAlpha = alpha
   ctx.strokeStyle = color
   ctx.fillStyle = color
-  ctx.lineWidth = 1.8
+  ctx.lineWidth = 1.5
   ctx.lineCap = 'round'
 
   // Convert oceanographic direction to screen angle
-  // 0°=north(up), 90°=east(right) → screen: 0=right, PI/2=down
   const screenAngle = ((angleDeg - 90) * Math.PI) / 180
-
   const dx = Math.cos(screenAngle) * length
   const dy = Math.sin(screenAngle) * length
 
-  // Arrow shaft
+  // Shaft
   ctx.beginPath()
   ctx.moveTo(x - dx * 0.4, y - dy * 0.4)
   ctx.lineTo(x + dx * 0.6, y + dy * 0.6)
@@ -206,12 +195,12 @@ function drawArrow(
   ctx.beginPath()
   ctx.moveTo(tipX, tipY)
   ctx.lineTo(
-    tipX - ARROW_HEAD_SIZE * Math.cos(headAngle - 0.45),
-    tipY - ARROW_HEAD_SIZE * Math.sin(headAngle - 0.45),
+    tipX - ARROW_HEAD_SIZE * Math.cos(headAngle - 0.4),
+    tipY - ARROW_HEAD_SIZE * Math.sin(headAngle - 0.4),
   )
   ctx.lineTo(
-    tipX - ARROW_HEAD_SIZE * Math.cos(headAngle + 0.45),
-    tipY - ARROW_HEAD_SIZE * Math.sin(headAngle + 0.45),
+    tipX - ARROW_HEAD_SIZE * Math.cos(headAngle + 0.4),
+    tipY - ARROW_HEAD_SIZE * Math.sin(headAngle + 0.4),
   )
   ctx.closePath()
   ctx.fill()
@@ -223,12 +212,11 @@ function drawArrow(
 
 export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const dataRef = useRef<CurrentData | null>(null)
+  const gridRef = useRef<CurrentGrid | null>(null)
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Sync canvas size
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current
     const map = mapRef.current
@@ -243,11 +231,10 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }, [mapRef])
 
-  // Render arrows
   const render = useCallback(() => {
     const canvas = canvasRef.current
     const map = mapRef.current
-    const data = dataRef.current
+    const grid = gridRef.current
     if (!canvas || !map) return
 
     const ctx = canvas.getContext('2d')
@@ -257,33 +244,30 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     const ch = canvas.height / (window.devicePixelRatio || 1)
     ctx.clearRect(0, 0, cw, ch)
 
-    if (!visible || !data || !data.points.length) return
+    if (!visible || !grid || grid.lats.length < 2) return
 
-    // Calculate max interpolation distance based on data point spacing
-    const bounds = map.getBounds()
-    const latSpan = bounds.getNorth() - bounds.getSouth()
-    const maxDist = latSpan * 0.15 // interpolation radius
+    ctx.globalAlpha = opacity
 
-    // Draw arrows at a regular screen-space grid
     for (let sy = ARROW_SPACING_PX / 2; sy < ch; sy += ARROW_SPACING_PX) {
       for (let sx = ARROW_SPACING_PX / 2; sx < cw; sx += ARROW_SPACING_PX) {
         const lngLat = map.unproject([sx, sy])
-        const lat = lngLat.lat
-        const lng = lngLat.lng
 
-        const current = interpolateCurrent(lat, lng, data.points, maxDist)
-        if (!current || current.speed < 0.15) continue // skip very weak currents
+        const speed = bilinearInterp(lngLat.lat, lngLat.lng, grid, grid.speed)
+        const direction = bilinearInterp(lngLat.lat, lngLat.lng, grid, grid.direction)
 
-        const t = Math.min(current.speed / SPEED_MAX_KMH, 1)
+        if (speed < 0.1 || isNaN(speed) || isNaN(direction)) continue
+
+        const t = Math.min(speed / SPEED_MAX_KMH, 1)
         const arrowLen = ARROW_LENGTH_MIN + t * (ARROW_LENGTH_MAX - ARROW_LENGTH_MIN)
-        const color = speedToColor(current.speed)
+        const color = speedToColor(speed)
 
-        drawArrow(ctx, sx, sy, current.direction, arrowLen, color, opacity)
+        drawArrow(ctx, sx, sy, direction, arrowLen, color)
       }
     }
+
+    ctx.globalAlpha = 1
   }, [mapRef, visible, opacity])
 
-  // Fetch data for visible bounds
   const fetchData = useCallback(() => {
     const map = mapRef.current
     if (!map || !visible) return
@@ -294,8 +278,8 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     const west = bounds.getWest()
     const east = bounds.getEast()
 
-    // Check if existing data covers the current view and is fresh
-    const d = dataRef.current
+    // Check if existing data covers current view and is fresh
+    const d = gridRef.current
     if (d && Date.now() - d.fetchedAt < DATA_TTL_MS &&
         d.bounds.south <= south && d.bounds.north >= north &&
         d.bounds.west <= west && d.bounds.east >= east) {
@@ -303,34 +287,29 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
       return
     }
 
-    // Cancel previous fetch
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
 
     setLoading(true)
 
-    // Pad bounds slightly to avoid re-fetching on small pans
-    fetchCurrentData(
-      south - 1, north + 1, west - 1, east + 1,
-      controller.signal,
-    ).then(result => {
-      if (controller.signal.aborted) return
-      if (result) {
-        dataRef.current = result
-        render()
-      }
-      setLoading(false)
-    }).catch(() => setLoading(false))
+    fetchCurrentGrid(south, north, west, east, controller.signal)
+      .then(result => {
+        if (controller.signal.aborted) return
+        if (result) {
+          gridRef.current = result
+          render()
+        }
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [mapRef, visible, render])
 
-  // Debounced fetch on map move
   const scheduleFetch = useCallback(() => {
     if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current)
     fetchTimerRef.current = setTimeout(fetchData, FETCH_DEBOUNCE_MS)
   }, [fetchData])
 
-  // Setup listeners
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -358,7 +337,6 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     }
   }, [mapRef, visible, syncSize, render, fetchData, scheduleFetch])
 
-  // Re-render when visibility or opacity changes
   useEffect(() => {
     if (visible) {
       fetchData()
@@ -372,7 +350,7 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     }
   }, [visible, opacity, fetchData])
 
-  void loading // loading state available for future UI indicator
+  void loading
 
   return (
     <canvas
