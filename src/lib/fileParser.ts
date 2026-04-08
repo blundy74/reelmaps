@@ -217,7 +217,17 @@ export async function parseCSV(file: File): Promise<{ spots: ParsedSpot[]; colum
 
 export async function parseGPX(file: File): Promise<ParsedSpot[]> {
   const { gpx } = await import('@tmcw/togeojson')
-  const text = await file.text()
+  let text = await file.text()
+
+  // Fix undeclared namespace prefixes (common in Garmin GPX exports)
+  // Add missing namespace declarations to the root element
+  if (text.includes('gpxx:') && !text.includes('xmlns:gpxx')) {
+    text = text.replace('<gpx ', '<gpx xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" ')
+  }
+  if (text.includes('gpxtpx:') && !text.includes('xmlns:gpxtpx')) {
+    text = text.replace('<gpx ', '<gpx xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1" ')
+  }
+
   const parser = new DOMParser()
   const doc = parser.parseFromString(text, 'text/xml')
 
@@ -231,6 +241,8 @@ export async function parseGPX(file: File): Promise<ParsedSpot[]> {
     if (feature.geometry.type === 'Point') {
       const [lng, lat, ele] = feature.geometry.coordinates
       if (isNaN(lat) || isNaN(lng)) continue
+      // Skip 0,0 placeholder waypoints
+      if (lat === 0 && lng === 0) continue
       spots.push({
         name: feature.properties?.name || feature.properties?.desc || undefined,
         lat,
