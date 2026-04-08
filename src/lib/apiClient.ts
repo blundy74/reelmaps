@@ -209,7 +209,25 @@ export interface ImportBatch {
 }
 
 export async function importSpots(filename: string, fileType: string, spots: { name?: string; lat: number; lng: number; depthFt?: number; notes?: string; icon?: string }[], icon?: string): Promise<{ batchId: string; importedCount: number }> {
-  return request('/api/spots/import', { method: 'POST', body: JSON.stringify({ filename, fileType, spots, icon }) })
+  const CHUNK_SIZE = 500
+  if (spots.length <= CHUNK_SIZE) {
+    return request('/api/spots/import', { method: 'POST', body: JSON.stringify({ filename, fileType, spots, icon }) })
+  }
+
+  // Chunk large imports into multiple requests to avoid 413 payload limit
+  let batchId = ''
+  let totalImported = 0
+  for (let i = 0; i < spots.length; i += CHUNK_SIZE) {
+    const chunk = spots.slice(i, i + CHUNK_SIZE)
+    const chunkName = i === 0 ? filename : `${filename} (part ${Math.floor(i / CHUNK_SIZE) + 1})`
+    const result = await request<{ batchId: string; importedCount: number }>('/api/spots/import', {
+      method: 'POST',
+      body: JSON.stringify({ filename: chunkName, fileType, spots: chunk, icon }),
+    })
+    if (i === 0) batchId = result.batchId
+    totalImported += result.importedCount
+  }
+  return { batchId, importedCount: totalImported }
 }
 
 export async function getImportBatches(): Promise<ImportBatch[]> {
