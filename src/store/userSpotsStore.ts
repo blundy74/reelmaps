@@ -46,8 +46,11 @@ export const useUserSpotsStore = create<UserSpotsState>()((set, get) => ({
   },
 
   addSpot: async (name, lat, lng, icon, depthFt) => {
+    // Auto-correct: Western Hemisphere = negative lng, Northern Hemisphere = positive lat
+    const cLat = lat < 0 ? -lat : lat
+    const cLng = lng > 0 ? -lng : lng
     try {
-      const spot = await saveSpot({ name, lat, lng, icon: icon || 'flag', depthFt })
+      const spot = await saveSpot({ name, lat: cLat, lng: cLng, icon: icon || 'flag', depthFt })
       set({ spots: [spot, ...get().spots] })
       return spot
     } catch (err: any) {

@@ -777,8 +777,12 @@ app.get('/api/spots', authenticateToken, async (req, res) => {
 
 app.post('/api/spots', authenticateToken, async (req, res) => {
   try {
-    const { name, lat, lng, depthFt, spotType, species, notes, icon, isPrivate } = req.body
+    let { name, lat, lng, depthFt, spotType, species, notes, icon, isPrivate } = req.body
     if (!name || lat == null || lng == null) return res.status(400).json({ error: 'Name, lat, lng required' })
+
+    // Auto-correct coordinates: Western Hemisphere = negative lng, Northern Hemisphere = positive lat
+    if (lng > 0) lng = -lng
+    if (lat < 0) lat = -lat
 
     const id = uuid()
     const now = new Date().toISOString()
@@ -855,7 +859,7 @@ app.post('/api/spots/import', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Maximum 5,000 spots per import' })
     }
 
-    // Validate each spot has lat/lng
+    // Validate and auto-correct each spot's lat/lng
     for (let i = 0; i < spots.length; i++) {
       const s = spots[i]
       if (s.lat == null || s.lng == null || isNaN(s.lat) || isNaN(s.lng)) {
@@ -864,6 +868,9 @@ app.post('/api/spots/import', authenticateToken, async (req, res) => {
       if (s.lat < -90 || s.lat > 90 || s.lng < -180 || s.lng > 180) {
         return res.status(400).json({ error: `Spot at index ${i} has out-of-range coordinates` })
       }
+      // Auto-correct: Western Hemisphere = negative lng, Northern Hemisphere = positive lat
+      if (s.lng > 0) s.lng = -s.lng
+      if (s.lat < 0) s.lat = -s.lat
     }
 
     const batchId = uuid()
