@@ -187,34 +187,26 @@ function SpotRow({ spot, onEdit, selectMode, selected, onToggleSelect }: {
       selected ? 'border-red-500/50 bg-red-500/10' : 'border-ocean-700 bg-ocean-800/50 hover:bg-ocean-750/80 hover:border-ocean-500',
     )}>
       <div className="flex items-center gap-2.5">
-        {/* Checkbox in select mode, icon otherwise */}
-        {selectMode ? (
-          <button
-            onClick={() => onToggleSelect(spot.id)}
-            className={cn(
-              'flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors border',
-              selected ? 'bg-red-500/20 border-red-500/50 text-red-400' : 'bg-ocean-700/80 border-ocean-600 text-slate-500 hover:border-slate-400',
-            )}
-          >
-            {selected ? (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <div className="w-3 h-3 rounded-sm border border-slate-500" />
-            )}
-          </button>
-        ) : (
-          <button
-            onClick={() => setFlyToTarget({ lat: spot.lat, lng: spot.lng, zoom: 12 })}
-            className="flex-shrink-0 w-8 h-8 rounded-lg bg-ocean-700/80 flex items-center justify-center hover:bg-ocean-600 transition-colors"
-            title="Fly to spot"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" fill={iconDef.color}>
-              <path d={iconDef.path} />
-            </svg>
-          </button>
+        {/* Checkbox when in select mode */}
+        {selectMode && (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect(spot.id)}
+            className="flex-shrink-0 w-4 h-4 rounded border-ocean-600 bg-ocean-800 text-red-500 focus:ring-red-500/30 cursor-pointer"
+          />
         )}
+
+        {/* Icon */}
+        <button
+          onClick={() => selectMode ? onToggleSelect(spot.id) : setFlyToTarget({ lat: spot.lat, lng: spot.lng, zoom: 12 })}
+          className="flex-shrink-0 w-8 h-8 rounded-lg bg-ocean-700/80 flex items-center justify-center hover:bg-ocean-600 transition-colors"
+          title={selectMode ? 'Toggle select' : 'Fly to spot'}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill={iconDef.color}>
+            <path d={iconDef.path} />
+          </svg>
+        </button>
 
         {/* Name + coords */}
         <div
@@ -327,14 +319,17 @@ export default function MySpotsPanel({ onImportClick }: { onImportClick?: () => 
           <div className="flex items-center justify-between">
             {selectMode ? (
               <div className="flex items-center gap-2">
-                <button
-                  onClick={selectAll}
-                  className="text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors"
-                >
+                <input
+                  type="checkbox"
+                  checked={selected.size === filtered.length && filtered.length > 0}
+                  onChange={selectAll}
+                  className="w-4 h-4 rounded border-ocean-600 bg-ocean-800 text-red-500 focus:ring-red-500/30 cursor-pointer"
+                />
+                <button onClick={selectAll} className="text-[10px] text-slate-400 hover:text-slate-200 transition-colors">
                   {selected.size === filtered.length ? 'Deselect All' : 'Select All'}
                 </button>
                 <span className="text-[10px] text-slate-500">
-                  {selected.size} selected
+                  ({selected.size})
                 </span>
               </div>
             ) : (
