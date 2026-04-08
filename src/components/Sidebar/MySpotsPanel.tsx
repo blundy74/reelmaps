@@ -167,7 +167,10 @@ function SpotMenu({ spot, onEdit, onDelete }: { spot: SavedSpot; onEdit: () => v
 
 // ── Spot Row ────────────────────────────────────────────────────────────────
 
-function SpotRow({ spot, onEdit }: { spot: SavedSpot; onEdit: (s: SavedSpot) => void }) {
+function SpotRow({ spot, onEdit, selectMode, selected, onToggleSelect }: {
+  spot: SavedSpot; onEdit: (s: SavedSpot) => void
+  selectMode: boolean; selected: boolean; onToggleSelect: (id: string) => void
+}) {
   const removeSpot = useUserSpotsStore((s) => s.removeSpot)
   const setFlyToTarget = useMapStore((s) => s.setFlyToTarget)
   const iconDef = getSpotIcon(spot.icon || 'fish')
@@ -179,23 +182,44 @@ function SpotRow({ spot, onEdit }: { spot: SavedSpot; onEdit: (s: SavedSpot) => 
   }
 
   return (
-    <div className="group rounded-xl p-3 border border-ocean-700 bg-ocean-800/50 hover:bg-ocean-750/80 hover:border-ocean-500 transition-all">
+    <div className={cn(
+      'group rounded-xl p-3 border transition-all',
+      selected ? 'border-red-500/50 bg-red-500/10' : 'border-ocean-700 bg-ocean-800/50 hover:bg-ocean-750/80 hover:border-ocean-500',
+    )}>
       <div className="flex items-center gap-2.5">
-        {/* Icon */}
-        <button
-          onClick={() => setFlyToTarget({ lat: spot.lat, lng: spot.lng, zoom: 12 })}
-          className="flex-shrink-0 w-8 h-8 rounded-lg bg-ocean-700/80 flex items-center justify-center hover:bg-ocean-600 transition-colors"
-          title="Fly to spot"
-        >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill={iconDef.color}>
-            <path d={iconDef.path} />
-          </svg>
-        </button>
+        {/* Checkbox in select mode, icon otherwise */}
+        {selectMode ? (
+          <button
+            onClick={() => onToggleSelect(spot.id)}
+            className={cn(
+              'flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors border',
+              selected ? 'bg-red-500/20 border-red-500/50 text-red-400' : 'bg-ocean-700/80 border-ocean-600 text-slate-500 hover:border-slate-400',
+            )}
+          >
+            {selected ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <div className="w-3 h-3 rounded-sm border border-slate-500" />
+            )}
+          </button>
+        ) : (
+          <button
+            onClick={() => setFlyToTarget({ lat: spot.lat, lng: spot.lng, zoom: 12 })}
+            className="flex-shrink-0 w-8 h-8 rounded-lg bg-ocean-700/80 flex items-center justify-center hover:bg-ocean-600 transition-colors"
+            title="Fly to spot"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill={iconDef.color}>
+              <path d={iconDef.path} />
+            </svg>
+          </button>
+        )}
 
         {/* Name + coords */}
         <div
           className="flex-1 min-w-0 cursor-pointer"
-          onClick={() => setFlyToTarget({ lat: spot.lat, lng: spot.lng, zoom: 12 })}
+          onClick={() => selectMode ? onToggleSelect(spot.id) : setFlyToTarget({ lat: spot.lat, lng: spot.lng, zoom: 12 })}
         >
           <h4 className="text-sm font-medium text-slate-200 leading-tight truncate">{spot.name}</h4>
           <div className="flex items-center gap-2 mt-0.5">
@@ -209,8 +233,8 @@ function SpotRow({ spot, onEdit }: { spot: SavedSpot; onEdit: (s: SavedSpot) => 
           </div>
         </div>
 
-        {/* 3-dot menu */}
-        <SpotMenu spot={spot} onEdit={() => onEdit(spot)} onDelete={handleDelete} />
+        {/* 3-dot menu (hidden in select mode) */}
+        {!selectMode && <SpotMenu spot={spot} onEdit={() => onEdit(spot)} onDelete={handleDelete} />}
       </div>
     </div>
   )
@@ -221,8 +245,12 @@ function SpotRow({ spot, onEdit }: { spot: SavedSpot; onEdit: (s: SavedSpot) => 
 export default function MySpotsPanel({ onImportClick }: { onImportClick?: () => void }) {
   const spots = useUserSpotsStore((s) => s.spots)
   const fetchSpots = useUserSpotsStore((s) => s.fetchSpots)
+  const removeSpot = useUserSpotsStore((s) => s.removeSpot)
   const [editingSpot, setEditingSpot] = useState<SavedSpot | null>(null)
   const [search, setSearch] = useState('')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => { fetchSpots() }, [fetchSpots])
 
@@ -230,11 +258,43 @@ export default function MySpotsPanel({ onImportClick }: { onImportClick?: () => 
     ? spots.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()))
     : spots
 
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const selectAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(filtered.map(s => s.id)))
+    }
+  }
+
+  const exitSelectMode = () => {
+    setSelectMode(false)
+    setSelected(new Set())
+  }
+
+  const deleteSelected = async () => {
+    if (!window.confirm(`Delete ${selected.size} spot${selected.size !== 1 ? 's' : ''}? This cannot be undone.`)) return
+    setDeleting(true)
+    for (const id of selected) {
+      await removeSpot(id)
+    }
+    setDeleting(false)
+    exitSelectMode()
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="px-3 pt-3 space-y-2">
         {/* Import button */}
-        {onImportClick && (
+        {onImportClick && !selectMode && (
           <button
             onClick={onImportClick}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20 transition-all"
@@ -247,7 +307,7 @@ export default function MySpotsPanel({ onImportClick }: { onImportClick?: () => 
         )}
 
         {/* Search (only when there are spots) */}
-        {spots.length > 0 && (
+        {spots.length > 0 && !selectMode && (
           <div className="relative">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -262,10 +322,50 @@ export default function MySpotsPanel({ onImportClick }: { onImportClick?: () => 
           </div>
         )}
 
+        {/* Stats + Select toggle */}
         {spots.length > 0 && (
-          <div className="text-xs text-slate-500">
-            <span className="text-slate-300 font-medium">{filtered.length}</span> spot{filtered.length !== 1 ? 's' : ''}
+          <div className="flex items-center justify-between">
+            {selectMode ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={selectAll}
+                  className="text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                >
+                  {selected.size === filtered.length ? 'Deselect All' : 'Select All'}
+                </button>
+                <span className="text-[10px] text-slate-500">
+                  {selected.size} selected
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs text-slate-500">
+                <span className="text-slate-300 font-medium">{filtered.length}</span> spot{filtered.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            <button
+              onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
+              className={cn(
+                'text-[10px] transition-colors',
+                selectMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-400',
+              )}
+            >
+              {selectMode ? 'Cancel' : 'Select'}
+            </button>
           </div>
+        )}
+
+        {/* Bulk delete bar */}
+        {selectMode && selected.size > 0 && (
+          <button
+            onClick={deleteSelected}
+            disabled={deleting}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-all disabled:opacity-50"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            {deleting ? 'Deleting...' : `Delete ${selected.size} Spot${selected.size !== 1 ? 's' : ''}`}
+          </button>
         )}
       </div>
 
@@ -283,7 +383,14 @@ export default function MySpotsPanel({ onImportClick }: { onImportClick?: () => 
           <div className="text-center py-8 text-slate-600 text-sm">No matches</div>
         ) : (
           filtered.map((spot) => (
-            <SpotRow key={spot.id} spot={spot} onEdit={setEditingSpot} />
+            <SpotRow
+              key={spot.id}
+              spot={spot}
+              onEdit={setEditingSpot}
+              selectMode={selectMode}
+              selected={selected.has(spot.id)}
+              onToggleSelect={toggleSelect}
+            />
           ))
         )}
       </div>
