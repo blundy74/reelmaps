@@ -314,7 +314,8 @@ export default function MySpotsPanel({ onImportClick }: { onImportClick?: () => 
             )}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15c-1.5-3 0-7 4-9s8 0 10 3 1 7-2 9-7 1-10-1" strokeDasharray="3 2" />
+              <circle cx="5" cy="15" r="1.5" fill="currentColor" stroke="none" />
             </svg>
             {lassoMode ? 'Draw on map to select...' : 'Lasso Select on Map'}
           </button>
