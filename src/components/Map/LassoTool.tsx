@@ -37,14 +37,16 @@ export default function LassoTool({ mapRef }: Props) {
       ? [...points, points[0]]
       : points
 
+    const isPolygon = closed && points.length > 2
+    const geometry: GeoJSON.Geometry = isPolygon
+      ? { type: 'Polygon' as const, coordinates: [coords] }
+      : { type: 'LineString' as const, coordinates: coords }
+
     const geojson: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
       features: [{
         type: 'Feature',
-        geometry: {
-          type: closed && points.length > 2 ? 'Polygon' : 'LineString',
-          coordinates: closed && points.length > 2 ? [coords] : coords,
-        },
+        geometry,
         properties: {},
       }],
     }
