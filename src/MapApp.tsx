@@ -26,7 +26,7 @@ import UpgradeBanner from './components/Auth/UpgradeBanner'
 import { useEffect, useState, useCallback } from 'react'
 
 export default function MapApp() {
-  const { selectedSpot, pinModeActive, setPinModeActive, measureMode, setMeasureMode, sidebarOpen, setSidebarOpen } = useMapStore()
+  const { selectedSpot, pinModeActive, setPinModeActive, measureMode, setMeasureMode, lassoMode, setLassoMode, sidebarOpen, setSidebarOpen } = useMapStore()
   const forecastBarOpen = useWeatherStore((s) => s.panelOpen)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -106,7 +106,7 @@ export default function MapApp() {
             <button
               onClick={() => {
                 setMeasureMode(!measureMode)
-                if (!measureMode) setPinModeActive(false)
+                if (!measureMode) { setPinModeActive(false); setLassoMode(false) }
               }}
               title={measureMode ? 'Cancel measure' : 'Measure distance'}
               className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-xs font-medium transition-all shadow-lg border ${
@@ -128,7 +128,7 @@ export default function MapApp() {
             <button
               onClick={() => {
                 setPinModeActive(!pinModeActive)
-                if (!pinModeActive) setMeasureMode(false)
+                if (!pinModeActive) { setMeasureMode(false); setLassoMode(false) }
               }}
               title={pinModeActive ? 'Cancel flag drop' : 'Drop a flag'}
               className={`flex items-center gap-2 px-3 py-2.5 md:py-2 rounded-xl text-xs font-medium transition-all shadow-lg border ${

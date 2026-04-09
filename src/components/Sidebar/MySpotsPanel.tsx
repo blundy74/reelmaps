@@ -238,6 +238,7 @@ export default function MySpotsPanel({ onImportClick }: { onImportClick?: () => 
   const spots = useUserSpotsStore((s) => s.spots)
   const fetchSpots = useUserSpotsStore((s) => s.fetchSpots)
   const removeSpot = useUserSpotsStore((s) => s.removeSpot)
+  const { lassoMode, setLassoMode, setPinModeActive, setMeasureMode } = useMapStore()
   const [editingSpot, setEditingSpot] = useState<SavedSpot | null>(null)
   const [search, setSearch] = useState('')
   const [selectMode, setSelectMode] = useState(false)
@@ -295,6 +296,27 @@ export default function MySpotsPanel({ onImportClick }: { onImportClick?: () => 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             Import Spots (CSV, GPX, FIT)
+          </button>
+        )}
+
+        {/* Lasso select button */}
+        {spots.length > 0 && !selectMode && (
+          <button
+            onClick={() => {
+              setLassoMode(!lassoMode)
+              if (!lassoMode) { setPinModeActive(false); setMeasureMode(false) }
+            }}
+            className={cn(
+              'w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all',
+              lassoMode
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse'
+                : 'bg-ocean-800 text-slate-400 border-ocean-600 hover:text-amber-400 hover:border-amber-500/40',
+            )}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+            </svg>
+            {lassoMode ? 'Draw on map to select...' : 'Lasso Select on Map'}
           </button>
         )}
 

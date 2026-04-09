@@ -10,6 +10,7 @@ import { formatCoords } from '../../lib/utils'
 import type { FishingSpot } from '../../types'
 import SpotPopup from './SpotPopup'
 import MeasureTool from './MeasureTool'
+import LassoTool from './LassoTool'
 import WindParticleCanvas from './WindParticleCanvas'
 import WindColorOverlay from './WindColorOverlay'
 import CloudOverlay from './CloudOverlay'
@@ -1129,6 +1130,7 @@ export default function FishingMap() {
         opacity={getLayer('current-arrows')?.opacity ?? 0.85}
       />
       <MeasureTool mapRef={mapRef} />
+      <LassoTool mapRef={mapRef} />
       {speciesPoint && (
         <SpeciesPredictor
           lat={speciesPoint.lat}

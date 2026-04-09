@@ -114,6 +114,9 @@ interface MapState {
   // Measure tool
   measureMode: boolean
 
+  // Lasso select tool
+  lassoMode: boolean
+
   // Fly-to target (set to trigger map.flyTo, consumed by FishingMap)
   flyToTarget: { lat: number; lng: number; zoom?: number } | null
 
@@ -131,6 +134,7 @@ interface MapState {
   setPinModeActive: (active: boolean) => void
   setDroppedPin: (coords: { lat: number; lng: number } | null) => void
   setMeasureMode: (active: boolean) => void
+  setLassoMode: (active: boolean) => void
   setFlyToTarget: (target: { lat: number; lng: number; zoom?: number } | null) => void
 }
 
@@ -160,6 +164,7 @@ export const useMapStore = create<MapState>()(
       pinModeActive: false,
       droppedPin: null,
       measureMode: false,
+      lassoMode: false,
       flyToTarget: null,
 
       setViewState: (vs) =>
@@ -189,6 +194,7 @@ export const useMapStore = create<MapState>()(
       setPinModeActive: (active) => set({ pinModeActive: active }),
       setDroppedPin: (coords) => set({ droppedPin: coords }),
       setMeasureMode: (active) => set({ measureMode: active }),
+      setLassoMode: (active) => set({ lassoMode: active }),
       setFlyToTarget: (target) => set({ flyToTarget: target }),
     }),
     {
