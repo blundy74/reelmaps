@@ -460,7 +460,10 @@ export default function FishingMap() {
         if (!layerState.visible) {
           // Hide layers that should not be visible
           if (layerId === 'fishing-spots') {
-            ['fishing-spots-labels', 'fishing-spots', 'fishing-spots-rigs', 'fishing-spots-fads', 'cluster-count', 'clusters'].forEach(
+            // Hide built-in fishing spot layers AND user-imported spot layers
+            ;['fishing-spots-labels', 'fishing-spots', 'fishing-spots-rigs', 'fishing-spots-fads', 'cluster-count', 'clusters',
+              'user-spots', 'user-spots-labels', 'user-clusters', 'user-cluster-count',
+            ].forEach(
               (id) => {
                 if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none')
               },
@@ -492,6 +495,12 @@ export default function FishingMap() {
               map.setPaintProperty('clusters', 'circle-opacity', layerState.opacity)
             }
           }
+          // Also restore user-imported spot layers
+          ;['user-spots', 'user-spots-labels', 'user-clusters', 'user-cluster-count'].forEach(
+            (id) => {
+              if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible')
+            },
+          )
         } else if (layerId === 'chlorophyll-7day') {
           // Special handling: 7-day composite = 7 sub-layers blended together
           const dayUrls = buildTileUrl(layerId, selectedDate)
@@ -876,12 +885,20 @@ export default function FishingMap() {
     const map = mapRef.current
     if (!map) return
 
-    const sync = () => syncLayers(map)
+    let cancelled = false
+    const sync = () => {
+      if (!cancelled) syncLayers(map)
+    }
 
     if (map.isStyleLoaded()) {
       sync()
     } else {
       map.once('style.load', sync)
+    }
+
+    return () => {
+      cancelled = true
+      map.off('style.load', sync)
     }
   }, [syncLayers, layers, selectedDate])
 
