@@ -6,6 +6,7 @@
     "start": "node handler.js"
   },
   "dependencies": {
+    "@aws-crypto/crc32c": "^5.2.0",
     "@aws-sdk/client-s3": "^3.500.0",
     "pngjs": "^7.0.0"
   },
