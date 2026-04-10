@@ -26,40 +26,44 @@ const MAX_CACHE = 25
 const COLOR_RAMP = new Uint8Array(256 * 4) // 256 entries × 4 bytes (RGBA)
 
 function buildColorRamp() {
-  // Standard NWS/AccuWeather-style radar color scale.
+  // Weather-Channel-matched radar color scale — vivid, high-alpha.
   // 0 = transparent (no precip, below 0.25 mm/h threshold)
   COLOR_RAMP[0] = 0; COLOR_RAMP[1] = 0; COLOR_RAMP[2] = 0; COLOR_RAMP[3] = 0
 
   for (let i = 1; i <= 255; i++) {
     let r, g, b, a
-    if (i <= 30) {
-      // Light rain (0.25-1 mm/h): dark green → green
-      const t = i / 30
-      r = 0; g = Math.round(100 + t * 100); b = 0; a = Math.round(80 + t * 60)
-    } else if (i <= 70) {
-      // Light-moderate (1-3 mm/h): green → yellow
-      const t = (i - 30) / 40
-      r = Math.round(t * 255); g = Math.round(200 + t * 55); b = 0; a = 150
-    } else if (i <= 110) {
-      // Moderate (3-7 mm/h): yellow → dark yellow/orange
-      const t = (i - 70) / 40
-      r = 255; g = Math.round(255 - t * 100); b = 0; a = 165
+    if (i <= 25) {
+      // Very light rain (0.25-0.8 mm/h): dark green
+      const t = i / 25
+      r = 0; g = Math.round(80 + t * 80); b = 0; a = Math.round(140 + t * 40)
+    } else if (i <= 55) {
+      // Light rain (0.8-2 mm/h): green → bright green
+      const t = (i - 25) / 30
+      r = 0; g = Math.round(160 + t * 95); b = 0; a = 200
+    } else if (i <= 85) {
+      // Light-moderate (2-5 mm/h): bright green → yellow
+      const t = (i - 55) / 30
+      r = Math.round(t * 255); g = 255; b = 0; a = 215
+    } else if (i <= 115) {
+      // Moderate (5-10 mm/h): yellow → orange
+      const t = (i - 85) / 30
+      r = 255; g = Math.round(255 - t * 128); b = 0; a = 225
     } else if (i <= 150) {
-      // Moderate-heavy (7-15 mm/h): orange → red-orange
-      const t = (i - 110) / 40
-      r = 255; g = Math.round(155 - t * 100); b = 0; a = 175
+      // Moderate-heavy (10-20 mm/h): orange → red
+      const t = (i - 115) / 35
+      r = 255; g = Math.round(127 - t * 127); b = 0; a = 235
     } else if (i <= 190) {
-      // Heavy (15-30 mm/h): red
+      // Heavy (20-40 mm/h): red → dark red
       const t = (i - 150) / 40
-      r = 255; g = Math.round(55 - t * 55); b = 0; a = 185
+      r = Math.round(255 - t * 55); g = 0; b = 0; a = 240
     } else if (i <= 230) {
-      // Very heavy (30-60 mm/h): dark red → magenta
+      // Very heavy (40-70 mm/h): dark red → magenta
       const t = (i - 190) / 40
-      r = Math.round(255 - t * 50); g = 0; b = Math.round(t * 150); a = 195
+      r = Math.round(200 + t * 55); g = 0; b = Math.round(t * 200); a = 245
     } else {
-      // Extreme (60+ mm/h): magenta → pink
+      // Extreme (70+ mm/h): magenta → white-pink
       const t = (i - 230) / 25
-      r = Math.round(205 + t * 50); g = Math.round(t * 100); b = Math.round(150 + t * 80); a = 200
+      r = 255; g = Math.round(t * 120); b = Math.round(200 + t * 55); a = 250
     }
     const off = i * 4
     COLOR_RAMP[off] = r

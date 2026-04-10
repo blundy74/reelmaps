@@ -228,6 +228,6 @@ export async function fetchRainViewerFrames(): Promise<RainViewerData> {
 
 /** Build a RainViewer radar tile URL for MapLibre */
 export function rainViewerTileUrl(host: string, path: string): string {
-  // Color scheme 6 = NEXRAD, smooth=1, snow=1
-  return `${host}${path}/256/{z}/{x}/{y}/6/1_1.png`
+  // Color scheme 2 = universal (vivid), smooth=0 (crisp raw reflectivity), snow=1
+  return `${host}${path}/256/{z}/{x}/{y}/2/0_1.png`
 }

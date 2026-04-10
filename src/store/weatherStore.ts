@@ -73,7 +73,7 @@ interface WeatherState {
 }
 
 const DEFAULT_OVERLAYS: WeatherOverlayDef[] = [
-  { id: 'radar', name: 'Rain Radar', visible: false, opacity: 0.7 },
+  { id: 'radar', name: 'Rain Radar', visible: false, opacity: 0.85 },
   { id: 'hrrr-wind', name: 'Wind Speed (HRRR)', visible: false, opacity: 0.6 },
   { id: 'hrrr-gust', name: 'Wind Gusts (HRRR)', visible: false, opacity: 0.6 },
   { id: 'hrrr-vis', name: 'Visibility (HRRR)', visible: false, opacity: 0.6 },
