@@ -159,6 +159,22 @@ const LEGENDS: LegendDef[] = [
       { value: 'Dense', position: '100%' },
     ],
   },
+  // ── Radar / Precipitation ──────────────────────────────────────────────
+  {
+    layerId: 'radar',
+    title: 'Rain Radar',
+    unit: 'mm/h',
+    isWeatherOverlay: true,
+    gradient: 'linear-gradient(to right, #005000, #00a000, #00ff00, #ffff00, #ff8000, #ff0000, #cc0000, #cc00cc, #ff80ff)',
+    labels: [
+      { value: '0.5', position: '0%' },
+      { value: '2', position: '22%' },
+      { value: '5', position: '40%' },
+      { value: '15', position: '58%' },
+      { value: '30', position: '72%' },
+      { value: '50+', position: '100%' },
+    ],
+  },
   // ── HRRR weather overlays ──────────────────────────────────────────────
   {
     layerId: 'hrrr-wind',
