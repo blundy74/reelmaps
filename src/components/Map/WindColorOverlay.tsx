@@ -10,6 +10,7 @@ import { useWeatherStore } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
+  mapReady?: number
 }
 
 const SCALE = 3 // render at 1/3 resolution for smoother interpolation
@@ -69,7 +70,7 @@ function windSpeedColor(speed: number): [number, number, number] {
   ]
 }
 
-export default function WindColorOverlay({ mapRef }: Props) {
+export default function WindColorOverlay({ mapRef, mapReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const renderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -198,7 +199,7 @@ export default function WindColorOverlay({ mapRef }: Props) {
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
-  }, [mapRef, windVisible, windOpacity, forecastHour, syncSize, renderOverlay])
+  }, [mapRef, windVisible, windOpacity, forecastHour, syncSize, renderOverlay, mapReady])
 
   return (
     <canvas

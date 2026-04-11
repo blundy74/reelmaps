@@ -18,6 +18,7 @@ import { useWeatherStore } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
+  mapReady?: number
 }
 
 // RainViewer (past radar)
@@ -33,7 +34,7 @@ const NDFD_TILE_URL =
   '?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/png&TRANSPARENT=true' +
   '&LAYERS=1&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}'
 
-export default function RadarOverlay({ mapRef }: Props) {
+export default function RadarOverlay({ mapRef, mapReady }: Props) {
   const radarVisible = useWeatherStore(
     (s) => s.overlays.find((o) => o.id === 'radar')?.visible ?? false,
   )
@@ -230,7 +231,7 @@ export default function RadarOverlay({ mapRef }: Props) {
     map.on('style.load', onStyleLoad)
 
     return () => { map.off('style.load', onStyleLoad) }
-  }, [mapRef, radarVisible, sync])
+  }, [mapRef, radarVisible, sync, mapReady])
 
   // ── Animate: update tiles when forecast hour changes (no effect teardown) ──
   useEffect(() => {

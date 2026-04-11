@@ -18,6 +18,7 @@ import { useWeatherStore } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
+  mapReady?: number
 }
 
 const PARTICLE_COUNT = 2000
@@ -72,7 +73,7 @@ function randomParticleGeo(bounds: maplibregl.LngLatBounds): Particle {
   }
 }
 
-export default function WindParticleCanvas({ mapRef }: Props) {
+export default function WindParticleCanvas({ mapRef, mapReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animRef = useRef<number>(0)
   const gridRef = useRef<WindGrid | null>(null)
@@ -265,7 +266,7 @@ export default function WindParticleCanvas({ mapRef }: Props) {
       if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current)
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
-  }, [mapRef, windVisible, windOpacity, syncSize, fetchGrid, scheduleFetch])
+  }, [mapRef, windVisible, windOpacity, syncSize, fetchGrid, scheduleFetch, mapReady])
 
   return (
     <canvas

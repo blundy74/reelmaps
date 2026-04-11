@@ -10,6 +10,7 @@ import { useWeatherStore } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
+  mapReady?: number
 }
 
 const ISOBAR_INTERVAL = 4 // mb between contour lines
@@ -140,7 +141,7 @@ function drawIsobars(
   }
 }
 
-export default function PressureOverlay({ mapRef }: Props) {
+export default function PressureOverlay({ mapRef, mapReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const renderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -248,7 +249,7 @@ export default function PressureOverlay({ mapRef }: Props) {
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
-  }, [mapRef, pressureVisible, pressureOpacity, forecastHour, syncSize, renderOverlay])
+  }, [mapRef, pressureVisible, pressureOpacity, forecastHour, syncSize, renderOverlay, mapReady])
 
   return (
     <canvas

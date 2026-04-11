@@ -15,6 +15,7 @@ import { useWeatherStore } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
+  mapReady?: number
 }
 
 interface Flash {
@@ -38,7 +39,7 @@ function getGlmTime(): string {
   return now.toISOString().slice(0, 19) + 'Z'
 }
 
-export default function LightningOverlay({ mapRef }: Props) {
+export default function LightningOverlay({ mapRef, mapReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const flashesRef = useRef<Flash[]>([])
   const animRef = useRef<number>(0)
@@ -235,7 +236,7 @@ export default function LightningOverlay({ mapRef }: Props) {
       map.off('style.load', onStyleLoad)
       if (pollTimer.current) clearInterval(pollTimer.current)
     }
-  }, [mapRef, lightningVisible, opacity, syncSize, fetchFlashes])
+  }, [mapRef, lightningVisible, opacity, syncSize, fetchFlashes, mapReady])
 
   // Cleanup on unmount
   useEffect(() => {

@@ -13,9 +13,10 @@ interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
   variable: string
   overlayId: string
+  mapReady?: number
 }
 
-export default function HrrrOverlay({ mapRef, variable, overlayId }: Props) {
+export default function HrrrOverlay({ mapRef, variable, overlayId, mapReady }: Props) {
   const visible = useWeatherStore(
     (s) => s.overlays.find((o) => o.id === overlayId)?.visible ?? false,
   )
@@ -125,7 +126,7 @@ export default function HrrrOverlay({ mapRef, variable, overlayId }: Props) {
     map.on('style.load', onStyleLoad)
 
     return () => { map.off('style.load', onStyleLoad) }
-  }, [mapRef, visible, opacity, forecastHour, variable, overlayId, sourceId, layerId, nowOffsetHours])
+  }, [mapRef, visible, opacity, forecastHour, variable, overlayId, sourceId, layerId, nowOffsetHours, mapReady])
 
   // Cleanup on unmount
   useEffect(() => {

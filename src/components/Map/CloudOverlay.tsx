@@ -10,11 +10,12 @@ import { useWeatherStore } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
+  mapReady?: number
 }
 
 const SCALE = 3 // render at 1/3 resolution, upscale with blur for smooth look
 
-export default function CloudOverlay({ mapRef }: Props) {
+export default function CloudOverlay({ mapRef, mapReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const renderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -158,7 +159,7 @@ export default function CloudOverlay({ mapRef }: Props) {
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
-  }, [mapRef, cloudVisible, cloudOpacity, forecastHour, syncSize, renderOverlay])
+  }, [mapRef, cloudVisible, cloudOpacity, forecastHour, syncSize, renderOverlay, mapReady])
 
   return (
     <canvas

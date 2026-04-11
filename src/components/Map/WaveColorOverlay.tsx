@@ -19,6 +19,7 @@ import { useWeatherStore } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
+  mapReady?: number
 }
 
 // Down-sample factor: render at 1/SCALE resolution, then upscale with blur
@@ -65,7 +66,7 @@ function waveHeightColor(heightM: number): [number, number, number] {
   ]
 }
 
-export default function WaveColorOverlay({ mapRef }: Props) {
+export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const renderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -216,7 +217,7 @@ export default function WaveColorOverlay({ mapRef }: Props) {
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
-  }, [mapRef, wavesVisible, wavesOpacity, syncSize, renderOverlay])
+  }, [mapRef, wavesVisible, wavesOpacity, syncSize, renderOverlay, mapReady])
 
   // Re-render on forecast hour change without tearing down listeners
   useEffect(() => {

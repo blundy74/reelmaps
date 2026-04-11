@@ -13,6 +13,7 @@ interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
   /** Which variant to display */
   variant?: 'hotspot' | 'hotspot-inshore' | 'hotspot-offshore' | 'sargassum' | 'sargassum-daily'
+  mapReady?: number
 }
 
 function toDateKey(isoDate: string): string {
@@ -54,7 +55,7 @@ function moveSpotLayersToTop(map: maplibregl.Map) {
   }
 }
 
-export default function HotspotOverlay({ mapRef, variant = 'hotspot' }: Props) {
+export default function HotspotOverlay({ mapRef, variant = 'hotspot', mapReady }: Props) {
   const sourceId = `${variant}-source`
   const layerId = `${variant}-layer`
 
@@ -113,7 +114,7 @@ export default function HotspotOverlay({ mapRef, variant = 'hotspot' }: Props) {
     return () => {
       map.off('style.load', onStyleLoad)
     }
-  }, [mapRef, visible, opacity, selectedDate, sourceId, layerId, variant])
+  }, [mapRef, visible, opacity, selectedDate, sourceId, layerId, variant, mapReady])
 
   // Cleanup on unmount
   useEffect(() => {

@@ -20,6 +20,7 @@ import { useWeatherStore } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
+  mapReady?: number
 }
 
 const BASE_PARTICLE_COUNT = 500
@@ -133,7 +134,7 @@ function isScreenPointOnLand(mask: LandMaskBitmap, x: number, y: number): boolea
   return mask.data[(iy * mask.width + ix) * 4 + 3] > 0
 }
 
-export default function WaveArrowOverlay({ mapRef }: Props) {
+export default function WaveArrowOverlay({ mapRef, mapReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animRef = useRef<number>(0)
   const gridRef = useRef<WaveGrid | null>(null)
@@ -342,7 +343,7 @@ export default function WaveArrowOverlay({ mapRef }: Props) {
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
       landMaskRef.current = null
     }
-  }, [mapRef, wavesVisible, syncSize, rebuildAfterMove, scheduleFetch])
+  }, [mapRef, wavesVisible, syncSize, rebuildAfterMove, scheduleFetch, mapReady])
 
   return (
     <canvas

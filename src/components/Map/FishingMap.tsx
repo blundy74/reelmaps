@@ -96,6 +96,8 @@ export default function FishingMap() {
   const popupRef = useRef<maplibregl.Popup | null>(null)
   const pinMarkerRef = useRef<maplibregl.Marker | null>(null)
   const [speciesPoint, setSpeciesPoint] = useState<{ lat: number; lng: number } | null>(null)
+  // Incremented after initial style.load so overlay components re-run their effects
+  const [mapReady, setMapReady] = useState(0)
 
   const {
     layers,
@@ -849,6 +851,8 @@ export default function FishingMap() {
           if (tiles.length) addRasterLayer(map, layerId, tiles, layerState.opacity)
         }
       }
+      // Signal overlay components that the map is ready
+      setMapReady((c) => c + 1)
     })
 
     mapRef.current = map
@@ -1123,24 +1127,24 @@ export default function FishingMap() {
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
-      <RadarOverlay mapRef={mapRef} />
-      <CloudOverlay mapRef={mapRef} />
-      <WaveColorOverlay mapRef={mapRef} />
-      <WaveArrowOverlay mapRef={mapRef} />
-      <WindColorOverlay mapRef={mapRef} />
-      <PressureOverlay mapRef={mapRef} />
-      <WindParticleCanvas mapRef={mapRef} />
-      <HrrrOverlay mapRef={mapRef} variable="wind" overlayId="hrrr-wind" />
-      <HrrrOverlay mapRef={mapRef} variable="gust" overlayId="hrrr-gust" />
-      <HrrrOverlay mapRef={mapRef} variable="vis" overlayId="hrrr-vis" />
-      <HrrrOverlay mapRef={mapRef} variable="lightning" overlayId="hrrr-lightning" />
-      <HrrrOverlay mapRef={mapRef} variable="cloud" overlayId="hrrr-cloud" />
-      <HotspotOverlay mapRef={mapRef} />
-      <HotspotOverlay mapRef={mapRef} variant="hotspot-inshore" />
-      <HotspotOverlay mapRef={mapRef} variant="hotspot-offshore" />
-      <HotspotOverlay mapRef={mapRef} variant="sargassum" />
-      <HotspotOverlay mapRef={mapRef} variant="sargassum-daily" />
-      <LightningOverlay mapRef={mapRef} />
+      <RadarOverlay mapRef={mapRef} mapReady={mapReady} />
+      <CloudOverlay mapRef={mapRef} mapReady={mapReady} />
+      <WaveColorOverlay mapRef={mapRef} mapReady={mapReady} />
+      <WaveArrowOverlay mapRef={mapRef} mapReady={mapReady} />
+      <WindColorOverlay mapRef={mapRef} mapReady={mapReady} />
+      <PressureOverlay mapRef={mapRef} mapReady={mapReady} />
+      <WindParticleCanvas mapRef={mapRef} mapReady={mapReady} />
+      <HrrrOverlay mapRef={mapRef} variable="wind" overlayId="hrrr-wind" mapReady={mapReady} />
+      <HrrrOverlay mapRef={mapRef} variable="gust" overlayId="hrrr-gust" mapReady={mapReady} />
+      <HrrrOverlay mapRef={mapRef} variable="vis" overlayId="hrrr-vis" mapReady={mapReady} />
+      <HrrrOverlay mapRef={mapRef} variable="lightning" overlayId="hrrr-lightning" mapReady={mapReady} />
+      <HrrrOverlay mapRef={mapRef} variable="cloud" overlayId="hrrr-cloud" mapReady={mapReady} />
+      <HotspotOverlay mapRef={mapRef} mapReady={mapReady} />
+      <HotspotOverlay mapRef={mapRef} variant="hotspot-inshore" mapReady={mapReady} />
+      <HotspotOverlay mapRef={mapRef} variant="hotspot-offshore" mapReady={mapReady} />
+      <HotspotOverlay mapRef={mapRef} variant="sargassum" mapReady={mapReady} />
+      <HotspotOverlay mapRef={mapRef} variant="sargassum-daily" mapReady={mapReady} />
+      <LightningOverlay mapRef={mapRef} mapReady={mapReady} />
       <CurrentArrowOverlay
         mapRef={mapRef}
         visible={getLayer('current-arrows')?.visible ?? false}
