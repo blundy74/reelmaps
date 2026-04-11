@@ -16,22 +16,50 @@ interface SpeciesEntry {
 }
 
 const SPECIES_DATA: SpeciesEntry[] = [
-  { name: 'Yellowfin Tuna', emoji: '\u{1F41F}', optimal: [75, 82], tolerance: [64, 86], depth: [0, 650], habitat: 'pelagic', regions: ['atlantic', 'gulf', 'pacific'] },
-  { name: 'Bluefin Tuna', emoji: '\u{1F41F}', optimal: [60, 72], tolerance: [55, 78], depth: [0, 3000], habitat: 'pelagic', regions: ['atlantic', 'pacific'] },
-  { name: 'Bigeye Tuna', emoji: '\u{1F41F}', optimal: [62, 74], tolerance: [55, 78], depth: [150, 1500], habitat: 'pelagic', regions: ['atlantic'] },
-  { name: 'Mahi-Mahi', emoji: '\u{1F42C}', optimal: [74, 80], tolerance: [70, 84], depth: [0, 250], habitat: 'pelagic', regions: ['atlantic', 'gulf', 'pacific'] },
-  { name: 'Wahoo', emoji: '\u26A1', optimal: [73, 78], tolerance: [64, 82], depth: [0, 400], habitat: 'pelagic', regions: ['atlantic', 'gulf'] },
-  { name: 'Blue Marlin', emoji: '\u{1F5E1}\uFE0F', optimal: [74, 82], tolerance: [72, 88], depth: [0, 600], habitat: 'pelagic', regions: ['atlantic', 'gulf'] },
-  { name: 'White Marlin', emoji: '\u{1F5E1}\uFE0F', optimal: [70, 80], tolerance: [68, 84], depth: [0, 500], habitat: 'pelagic', regions: ['atlantic'] },
-  { name: 'Sailfish', emoji: '\u26F5', optimal: [72, 82], tolerance: [70, 86], depth: [0, 200], habitat: 'pelagic', regions: ['atlantic', 'gulf'] },
-  { name: 'Swordfish', emoji: '\u2694\uFE0F', optimal: [64, 72], tolerance: [58, 78], depth: [0, 2000], habitat: 'pelagic', regions: ['atlantic', 'gulf'] },
-  { name: 'King Mackerel', emoji: '\u{1F420}', optimal: [70, 78], tolerance: [65, 82], depth: [30, 200], habitat: 'reef', regions: ['atlantic', 'gulf'] },
-  { name: 'Cobia', emoji: '\u{1F421}', optimal: [68, 78], tolerance: [62, 84], depth: [20, 200], habitat: 'structure', regions: ['atlantic', 'gulf'] },
-  { name: 'Red Snapper', emoji: '\u{1F534}', optimal: [55, 70], tolerance: [50, 75], depth: [60, 400], habitat: 'reef', regions: ['atlantic', 'gulf'] },
-  { name: 'Grouper', emoji: '\u{1FAA8}', optimal: [65, 78], tolerance: [58, 82], depth: [30, 200], habitat: 'reef', regions: ['atlantic', 'gulf'] },
-  { name: 'Yellowtail', emoji: '\u{1F49B}', optimal: [64, 72], tolerance: [60, 76], depth: [0, 400], habitat: 'pelagic', regions: ['pacific'] },
-  { name: 'Albacore', emoji: '\u{1F3AF}', optimal: [62, 65], tolerance: [59, 68], depth: [0, 1000], habitat: 'pelagic', regions: ['pacific'] },
-  { name: 'Striped Marlin', emoji: '\u{1F3F9}', optimal: [68, 76], tolerance: [61, 78], depth: [0, 500], habitat: 'pelagic', regions: ['pacific'] },
+  // ── Tunas ─────────────────────────────────────────────────────────────
+  { name: 'Yellowfin Tuna',  emoji: '\u{1F41F}', optimal: [72, 82], tolerance: [68, 86], depth: [100, 1000], habitat: 'pelagic', regions: ['atlantic', 'gulf', 'pacific'] },
+  { name: 'Bluefin Tuna',    emoji: '\u{1F41F}', optimal: [61, 72], tolerance: [55, 78], depth: [100, 3000], habitat: 'pelagic', regions: ['atlantic', 'pacific'] },
+  { name: 'Bigeye Tuna',     emoji: '\u{1F41F}', optimal: [63, 76], tolerance: [58, 80], depth: [300, 1500], habitat: 'pelagic', regions: ['atlantic', 'gulf'] },
+  { name: 'Blackfin Tuna',   emoji: '\u{1F41F}', optimal: [72, 82], tolerance: [68, 84], depth: [50, 600],  habitat: 'pelagic', regions: ['atlantic', 'gulf'] },
+  { name: 'Albacore',        emoji: '\u{1F41F}', optimal: [60, 66], tolerance: [57, 70], depth: [100, 1500], habitat: 'pelagic', regions: ['pacific', 'atlantic'] },
+  { name: 'Skipjack Tuna',   emoji: '\u{1F41F}', optimal: [75, 83], tolerance: [70, 86], depth: [0, 850],   habitat: 'pelagic', regions: ['atlantic', 'gulf', 'pacific'] },
+
+  // ── Billfish ──────────────────────────────────────────────────────────
+  { name: 'Blue Marlin',     emoji: '\u{1F5E1}\uFE0F', optimal: [76, 84], tolerance: [72, 88], depth: [200, 3000], habitat: 'pelagic', regions: ['atlantic', 'gulf', 'pacific'] },
+  { name: 'White Marlin',    emoji: '\u{1F5E1}\uFE0F', optimal: [72, 80], tolerance: [68, 84], depth: [200, 1500], habitat: 'pelagic', regions: ['atlantic', 'gulf'] },
+  { name: 'Sailfish',        emoji: '\u26F5',           optimal: [76, 84], tolerance: [72, 86], depth: [60, 600],  habitat: 'pelagic', regions: ['atlantic', 'gulf'] },
+  { name: 'Swordfish',       emoji: '\u2694\uFE0F',     optimal: [64, 74], tolerance: [58, 80], depth: [600, 3000], habitat: 'pelagic', regions: ['atlantic', 'gulf', 'pacific'] },
+  { name: 'Striped Marlin',  emoji: '\u{1F3F9}',        optimal: [68, 76], tolerance: [63, 80], depth: [100, 800], habitat: 'pelagic', regions: ['pacific'] },
+
+  // ── Pelagics ──────────────────────────────────────────────────────────
+  { name: 'Mahi-Mahi',       emoji: '\u{1F42C}', optimal: [76, 84], tolerance: [72, 86], depth: [30, 500],  habitat: 'pelagic', regions: ['atlantic', 'gulf', 'pacific'] },
+  { name: 'Wahoo',           emoji: '\u26A1',    optimal: [74, 82], tolerance: [70, 84], depth: [100, 600], habitat: 'pelagic', regions: ['atlantic', 'gulf', 'pacific'] },
+  { name: 'King Mackerel',   emoji: '\u{1F420}', optimal: [72, 82], tolerance: [68, 84], depth: [30, 300],  habitat: 'reef', regions: ['atlantic', 'gulf'] },
+  { name: 'Spanish Mackerel', emoji: '\u{1F420}', optimal: [70, 82], tolerance: [65, 84], depth: [10, 100], habitat: 'nearshore', regions: ['atlantic', 'gulf'] },
+  { name: 'Cobia',           emoji: '\u{1F421}', optimal: [70, 82], tolerance: [65, 85], depth: [20, 300],  habitat: 'structure', regions: ['atlantic', 'gulf'] },
+  { name: 'Tripletail',      emoji: '\u{1F421}', optimal: [72, 84], tolerance: [68, 86], depth: [5, 60],    habitat: 'nearshore', regions: ['atlantic', 'gulf'] },
+
+  // ── Reef / Bottom ─────────────────────────────────────────────────────
+  { name: 'Red Snapper',     emoji: '\u{1F534}', optimal: [68, 82], tolerance: [62, 85], depth: [60, 400],  habitat: 'reef', regions: ['atlantic', 'gulf'] },
+  { name: 'Vermilion Snapper', emoji: '\u{1F534}', optimal: [68, 80], tolerance: [62, 84], depth: [60, 350], habitat: 'reef', regions: ['atlantic', 'gulf'] },
+  { name: 'Grouper (Gag)',   emoji: '\u{1FAA8}', optimal: [68, 78], tolerance: [62, 82], depth: [30, 250],  habitat: 'reef', regions: ['atlantic', 'gulf'] },
+  { name: 'Grouper (Red)',   emoji: '\u{1FAA8}', optimal: [72, 82], tolerance: [66, 85], depth: [60, 400],  habitat: 'reef', regions: ['atlantic', 'gulf'] },
+  { name: 'Greater Amberjack', emoji: '\u{1F49B}', optimal: [70, 82], tolerance: [65, 85], depth: [60, 400], habitat: 'reef', regions: ['atlantic', 'gulf'] },
+  { name: 'Triggerfish',     emoji: '\u{1FAA8}', optimal: [68, 82], tolerance: [62, 85], depth: [40, 250],  habitat: 'reef', regions: ['atlantic', 'gulf'] },
+  { name: 'Tilefish',        emoji: '\u{1FAA8}', optimal: [52, 62], tolerance: [48, 68], depth: [500, 1500], habitat: 'reef', regions: ['atlantic', 'gulf'] },
+
+  // ── Pacific ───────────────────────────────────────────────────────────
+  { name: 'Yellowtail',      emoji: '\u{1F49B}', optimal: [62, 70], tolerance: [58, 74], depth: [30, 400],  habitat: 'pelagic', regions: ['pacific'] },
+  { name: 'White Seabass',   emoji: '\u{1F41F}', optimal: [58, 66], tolerance: [54, 70], depth: [10, 200],  habitat: 'nearshore', regions: ['pacific'] },
+  { name: 'Dorado (Pacific)', emoji: '\u{1F42C}', optimal: [76, 84], tolerance: [72, 86], depth: [30, 500], habitat: 'pelagic', regions: ['pacific'] },
+
+  // ── Inshore / Nearshore ───────────────────────────────────────────────
+  { name: 'Red Drum (Redfish)', emoji: '\u{1F534}', optimal: [70, 84], tolerance: [60, 88], depth: [1, 40], habitat: 'nearshore', regions: ['atlantic', 'gulf'] },
+  { name: 'Speckled Trout',  emoji: '\u{1F420}', optimal: [65, 78], tolerance: [58, 82], depth: [1, 30],    habitat: 'nearshore', regions: ['atlantic', 'gulf'] },
+  { name: 'Flounder',        emoji: '\u{1F41F}', optimal: [58, 72], tolerance: [52, 78], depth: [5, 100],   habitat: 'nearshore', regions: ['atlantic', 'gulf'] },
+  { name: 'Sheepshead',      emoji: '\u{1FAA8}', optimal: [62, 76], tolerance: [55, 80], depth: [5, 50],    habitat: 'structure', regions: ['atlantic', 'gulf'] },
+  { name: 'Tarpon',          emoji: '\u{1F3C6}', optimal: [76, 88], tolerance: [72, 90], depth: [3, 100],   habitat: 'nearshore', regions: ['atlantic', 'gulf'] },
+  { name: 'Snook',           emoji: '\u{1F3C6}', optimal: [74, 86], tolerance: [70, 90], depth: [1, 40],    habitat: 'nearshore', regions: ['atlantic', 'gulf'] },
 ]
 
 // ---------------------------------------------------------------------------
@@ -73,14 +101,25 @@ function depthScore(depthFt: number, species: SpeciesEntry): number {
   return 0
 }
 
-function regionFromLng(lng: number): string {
-  if (lng > -82) return 'atlantic'
-  if (lng >= -98) return 'gulf'
-  return 'pacific'
+function regionFromCoords(lat: number, lng: number): string {
+  // Pacific: west of Baja/California
+  if (lng < -118) return 'pacific'
+  if (lng < -105 && lat < 33) return 'pacific'
+
+  // Gulf of Mexico: bounded by Florida Keys, Straits of Florida, and south Texas
+  // Roughly: west of -80° (Florida west coast), north of 18° (Yucatan), east of -98° (Texas)
+  if (lng >= -98 && lng <= -80 && lat >= 18 && lat <= 31) return 'gulf'
+  // Florida panhandle and northern gulf
+  if (lng >= -89 && lng <= -82 && lat >= 29 && lat <= 31) return 'gulf'
+  // Western gulf (south Texas coast)
+  if (lng >= -98 && lng <= -93 && lat >= 25 && lat <= 30) return 'gulf'
+
+  // Default to Atlantic for US East Coast and Caribbean
+  return 'atlantic'
 }
 
-function regionScore(lng: number, species: SpeciesEntry): number {
-  return species.regions.includes(regionFromLng(lng)) ? 1.0 : 0.0
+function regionScore(lat: number, lng: number, species: SpeciesEntry): number {
+  return species.regions.includes(regionFromCoords(lat, lng)) ? 1.0 : 0.0
 }
 
 interface ScoredSpecies {
@@ -90,10 +129,10 @@ interface ScoredSpecies {
   depthVal: number
 }
 
-function scoreAll(sst: number, depthFt: number, lng: number): ScoredSpecies[] {
+function scoreAll(sst: number, depthFt: number, lat: number, lng: number): ScoredSpecies[] {
   return SPECIES_DATA
     .map((sp) => {
-      const s = sstScore(sst, sp) * depthScore(depthFt, sp) * regionScore(lng, sp)
+      const s = sstScore(sst, sp) * depthScore(depthFt, sp) * regionScore(lat, lng, sp)
       return { species: sp, score: s, sstVal: sst, depthVal: depthFt }
     })
     .filter((r) => r.score > 0.01)
@@ -180,13 +219,13 @@ export default function SpeciesPredictor({ lat, lng, onClose, className }: Speci
       setDepthFt(depthVal)
 
       if (sstVal != null && depthVal != null) {
-        setResults(scoreAll(sstVal, depthVal, lng))
+        setResults(scoreAll(sstVal, depthVal, lat, lng))
       } else if (sstVal != null) {
         // Score without depth info — treat depth as neutral (1.0)
         const partial = SPECIES_DATA
           .map((sp) => ({
             species: sp,
-            score: sstScore(sstVal, sp) * regionScore(lng, sp),
+            score: sstScore(sstVal, sp) * regionScore(lat, lng, sp),
             sstVal,
             depthVal: 0,
           }))
@@ -213,7 +252,7 @@ export default function SpeciesPredictor({ lat, lng, onClose, className }: Speci
     return 'bg-slate-500'
   }
 
-  const region = regionFromLng(lng)
+  const region = regionFromCoords(lat, lng)
 
   return (
     <div
