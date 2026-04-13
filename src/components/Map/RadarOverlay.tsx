@@ -150,7 +150,7 @@ export default function RadarOverlay({ mapRef, mapReady }: Props) {
       const tileUrl = rainViewerTileUrl(rv.host, allFrames[bestIdx].path)
 
       if (!map.getSource(RV_SOURCE)) {
-        map.addSource(RV_SOURCE, { type: 'raster', tiles: [tileUrl], tileSize: 256 })
+        map.addSource(RV_SOURCE, { type: 'raster', tiles: [tileUrl], tileSize: 256, maxzoom: 7 })
       }
       if (!map.getLayer(RV_LAYER)) {
         map.addLayer({
