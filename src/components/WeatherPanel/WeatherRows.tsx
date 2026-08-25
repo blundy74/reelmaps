@@ -1,8 +1,9 @@
 /**
  * Windy Basic row set, in the right rail (not a bottom dock).
  * 3-hour columns, color-coded wind/gust, precip amounts, selected-hour
- * column ("Time of forecast on map"), dashed now-tick. Seas + period
- * are extra fishing rows. Air temp is air temp — not cloned as SST.
+ * column ("Time of forecast on map"), dashed now-tick.
+ * Fishing extras: Waves (ft) + swell period (s) only.
+ * Do not add wave power, model water-temp, tides, or ECMWF WAM chips.
  */
 
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
@@ -277,8 +278,8 @@ export default function WeatherRows() {
       ),
     },
     {
-      key: 'seas',
-      label: 'Seas ft',
+      key: 'waves',
+      label: 'Waves ft',
       render: (c) => {
         const ft = c.marine?.waveHeight
         if (ft == null) return <span className="text-slate-600">–</span>
@@ -295,10 +296,10 @@ export default function WeatherRows() {
     },
     {
       key: 'period',
-      label: 'Period s',
+      label: 'Swell s',
       render: (c) => (
         <span className="text-slate-300">
-          {c.marine?.wavePeriod ? Math.round(c.marine.wavePeriod) : '–'}
+          {c.marine?.swellPeriod ? Math.round(c.marine.swellPeriod) : '–'}
         </span>
       ),
     },
@@ -336,7 +337,7 @@ export default function WeatherRows() {
               key={row.key}
               className={cn(
                 'flex border-t border-white/5',
-                row.key === 'wind' || row.key === 'gust' || row.key === 'seas' ? 'h-6' : 'h-5',
+                row.key === 'wind' || row.key === 'gust' || row.key === 'waves' ? 'h-6' : 'h-5',
               )}
             >
               <Label>{row.label}</Label>
@@ -348,7 +349,7 @@ export default function WeatherRows() {
                     selected={isSelected}
                     night={!c.entry.isDay && (row.key === 'hours' || row.key === 'sky')}
                     onClick={pick(c.hourlyIndex)}
-                    className={row.key === 'wind' || row.key === 'gust' || row.key === 'seas' ? 'p-0 overflow-hidden' : ''}
+                    className={row.key === 'wind' || row.key === 'gust' || row.key === 'waves' ? 'p-0 overflow-hidden' : ''}
                   >
                     {row.render(c)}
                   </Cell>

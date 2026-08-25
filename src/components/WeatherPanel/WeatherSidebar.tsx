@@ -138,7 +138,7 @@ function CaptainsBrief() {
       </p>
       <p className="text-[11px] text-slate-300 leading-snug">
         {seas
-          ? `Seas ${seas.waveHeight.toFixed(1)} ft @ ${Math.round(seas.wavePeriod)}s`
+          ? `Waves ${seas.waveHeight.toFixed(1)} ft · swell ${Math.round(seas.swellPeriod)}s`
           : `${current.cloudCover}% cloud`}
         {rain > 0 ? ` · rain ${rain}%` : ''}
       </p>
