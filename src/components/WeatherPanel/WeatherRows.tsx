@@ -1,9 +1,9 @@
 /**
- * Windy Basic row set, in the right rail (not a bottom dock).
- * 3-hour columns, color-coded wind/gust, precip amounts, selected-hour
- * column ("Time of forecast on map"), dashed now-tick.
- * Fishing extras: Waves (ft) + swell period (s) only.
- * Do not add wave power, model water-temp, tides, or ECMWF WAM chips.
+ * Compact point-forecast table in the right rail.
+ * Steals Windy's BOTTOM table IA (not the right-edge layer pills):
+ * 3-hour columns, color wind/gust, rain amounts, red now-tick, map-time
+ * selection. Fishing extras: Waves (ft) + swell period (s) only.
+ * No feels-like, pollen, airgram, 6 display modes, or ECMWF WAM chips.
  */
 
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
@@ -91,14 +91,12 @@ function nowTickOffset(cols: Col[]): number | null {
 
 function Cell({
   children,
-  selected,
   night,
   onClick,
   className,
   style,
 }: {
   children: ReactNode
-  selected: boolean
   night?: boolean
   onClick: () => void
   className?: string
@@ -111,8 +109,7 @@ function Cell({
       style={{ width: COL_W, ...style }}
       className={cn(
         'flex items-center justify-center h-full text-[10px] font-mono leading-none flex-shrink-0',
-        night && 'bg-sky-950/40',
-        selected && 'ring-1 ring-inset ring-orange-400/80 bg-orange-500/10',
+        night && 'bg-slate-500/10',
         className,
       )}
     >
@@ -308,8 +305,8 @@ export default function WeatherRows() {
   return (
     <div>
       <div className="flex items-center gap-1.5 px-0.5 mb-1.5">
-        <span className="w-0.5 h-3 rounded-full bg-orange-500 flex-shrink-0" />
-        <span className="text-[10px] font-semibold text-orange-400 tracking-wide">
+        <span className="w-0.5 h-3 rounded-full bg-red-500 flex-shrink-0" />
+        <span className="text-[10px] font-semibold text-red-400 tracking-wide">
           Time of forecast on map
         </span>
         <span className="text-[10px] font-mono text-slate-400 ml-auto">{mapTime}</span>
@@ -341,24 +338,27 @@ export default function WeatherRows() {
               )}
             >
               <Label>{row.label}</Label>
-              {cols.map((c, i) => {
-                const isSelected = i === selectedCol
-                return (
-                  <Cell
-                    key={c.entry.time + row.key}
-                    selected={isSelected}
-                    night={!c.entry.isDay && (row.key === 'hours' || row.key === 'sky')}
-                    onClick={pick(c.hourlyIndex)}
-                    className={row.key === 'wind' || row.key === 'gust' || row.key === 'waves' ? 'p-0 overflow-hidden' : ''}
-                  >
-                    {row.render(c)}
-                  </Cell>
-                )
-              })}
+              {cols.map((c) => (
+                <Cell
+                  key={c.entry.time + row.key}
+                  night={!c.entry.isDay}
+                  onClick={pick(c.hourlyIndex)}
+                  className={row.key === 'wind' || row.key === 'gust' || row.key === 'waves' ? 'p-0 overflow-hidden' : ''}
+                >
+                  {row.render(c)}
+                </Cell>
+              ))}
             </div>
           ))}
 
-          {/* Now-tick dashed line (Savvy/Windy time-strip, same rail) */}
+          {selectedCol >= 0 && (
+            <div
+              className="pointer-events-none absolute top-3 bottom-0 z-[15] bg-red-500/12 border-x border-red-500/35"
+              style={{ left: LABEL_W + selectedCol * COL_W, width: COL_W }}
+            />
+          )}
+
+          {/* Now-tick dashed line — Windy red now-line, same rail */}
           {tickLeft != null && (
             <div
               className="pointer-events-none absolute top-3 bottom-0 z-20"
@@ -366,12 +366,15 @@ export default function WeatherRows() {
             >
               <div
                 className="h-full"
-                style={{ borderLeft: '2px dashed #fb923c', marginLeft: -1 }}
+                style={{ borderLeft: '2px dashed #ef4444', marginLeft: -1 }}
               />
             </div>
           )}
         </div>
       </div>
+      <p className="text-[9px] text-slate-500 mt-1.5 px-0.5">
+        3h · Source: Open-Meteo
+      </p>
     </div>
   )
 }

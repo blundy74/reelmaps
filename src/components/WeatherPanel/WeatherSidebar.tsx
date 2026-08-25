@@ -1,6 +1,7 @@
 /**
- * Right rail — Windy-class chrome: overlay cards, pinned legend, and
- * weather rows (3-hour Windy Basic set + seas/period) in ONE rail.
+ * Right rail — overlay cards + point-forecast table in ONE panel.
+ * Windy puts numbers in a bottom table; ReelMaps puts that table IA here
+ * (not a 12-item layer-pill rail, not 6 display modes).
  */
 
 import { useEffect, useRef } from 'react'
@@ -17,95 +18,48 @@ import {
 import { PinnedLegend } from '../ui/ColorLegend'
 import WeatherRows from './WeatherRows'
 
-interface CardDef {
-  id: string
-  name: string
-  kind: 'imagery' | 'overlay'
-}
+const IMAGERY = [
+  { id: 'sst-mur', name: 'SST MUR' },
+  { id: 'sst-goes', name: 'SST Daily' },
+  { id: 'chlorophyll', name: 'Chl-a' },
+  { id: 'true-color-viirs', name: 'True Color' },
+  { id: 'currents', name: 'Currents' },
+  { id: 'sargassum', name: 'Weedlines' },
+] as const
 
-const IMAGERY: CardDef[] = [
-  { id: 'sst-mur', name: 'SST MUR', kind: 'imagery' },
-  { id: 'sst-goes', name: 'SST Daily', kind: 'imagery' },
-  { id: 'chlorophyll', name: 'Chl-a', kind: 'imagery' },
-  { id: 'true-color-viirs', name: 'True Color', kind: 'imagery' },
-  { id: 'currents', name: 'Currents', kind: 'imagery' },
-  { id: 'sargassum', name: 'Weedlines', kind: 'imagery' },
-]
+const OVERLAYS = [
+  { id: 'wind', name: 'Wind' },
+  { id: 'waves', name: 'Waves' },
+  { id: 'radar', name: 'Radar' },
+  { id: 'lightning', name: 'Lightning' },
+] as const
 
-const OVERLAYS: CardDef[] = [
-  { id: 'wind', name: 'Wind', kind: 'overlay' },
-  { id: 'waves', name: 'Waves', kind: 'overlay' },
-  { id: 'radar', name: 'Radar', kind: 'overlay' },
-  { id: 'pressure', name: 'Pressure', kind: 'overlay' },
-  { id: 'cloud-cover', name: 'Clouds', kind: 'overlay' },
-  { id: 'lightning', name: 'Lightning', kind: 'overlay' },
-]
-
-function OverlayCard({
-  def,
+function LayerPill({
+  name,
   active,
-  opacity,
   locked,
   onToggle,
-  onOpacity,
 }: {
-  def: CardDef
+  name: string
   active: boolean
-  opacity?: number
   locked?: boolean
   onToggle: () => void
-  onOpacity?: (v: number) => void
 }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onToggle}
       className={cn(
-        'rounded-lg border px-2 py-1.5 transition-all',
+        'px-2 py-1 rounded-full text-[10px] font-medium border transition-colors truncate',
         active
-          ? 'border-cyan-400/40 bg-cyan-500/12'
-          : 'border-white/8 bg-black/20 hover:border-white/16',
+          ? 'bg-cyan-500/20 border-cyan-400/45 text-cyan-200'
+          : 'bg-black/25 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300',
         locked && 'opacity-60',
       )}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex items-center gap-1.5 w-full text-left"
-      >
-        <span
-          className={cn(
-            'w-6 h-3.5 rounded-full relative flex-shrink-0 transition-colors',
-            active ? 'bg-cyan-500' : 'bg-ocean-600',
-          )}
-        >
-          <span
-            className={cn(
-              'absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-transform',
-              active ? 'translate-x-3' : 'translate-x-0.5',
-            )}
-          />
-        </span>
-        <span className={cn('text-[11px] font-medium truncate', active ? 'text-slate-100' : 'text-slate-400')}>
-          {def.name}
-        </span>
-        {locked && <span className="ml-auto text-[8px] text-amber-400/80">PRO</span>}
-      </button>
-      {active && onOpacity && opacity != null && (
-        <div className="flex items-center gap-1.5 mt-1 pl-7">
-          <input
-            type="range"
-            min="0.05"
-            max="1"
-            step="0.05"
-            value={opacity}
-            onChange={(e) => onOpacity(parseFloat(e.target.value))}
-            className="flex-1"
-          />
-          <span className="text-[9px] text-slate-500 w-6 text-right font-mono">
-            {Math.round(opacity * 100)}
-          </span>
-        </div>
-      )}
-    </div>
+      {name}
+      {locked && <span className="ml-1 text-[8px] text-amber-400/80">PRO</span>}
+    </button>
   )
 }
 
@@ -158,7 +112,6 @@ export default function WeatherSidebar({ open, onClose }: Props) {
     setPanelOpen,
     overlays,
     toggleOverlay,
-    setOverlayOpacity,
     current,
     loading,
     location,
@@ -167,7 +120,6 @@ export default function WeatherSidebar({ open, onClose }: Props) {
 
   const layers = useMapStore((s) => s.layers)
   const toggleLayer = useMapStore((s) => s.toggleLayer)
-  const setLayerOpacity = useMapStore((s) => s.setLayerOpacity)
   const droppedPin = useMapStore((s) => s.droppedPin)
   const clickedPoint = useMapStore((s) => s.clickedPoint)
   const viewState = useMapStore((s) => s.viewState)
@@ -243,21 +195,16 @@ export default function WeatherSidebar({ open, onClose }: Props) {
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 px-0.5">
               Imagery
             </p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {IMAGERY.map((def) => {
-                const layer = layerById(def.id)
-                return (
-                  <OverlayCard
-                    key={def.id}
-                    def={def}
-                    active={layer?.visible ?? false}
-                    opacity={layer?.opacity}
-                    locked={!isPremium}
-                    onToggle={() => handleImagery(def.id)}
-                    onOpacity={isPremium ? (v) => setLayerOpacity(def.id, v) : undefined}
-                  />
-                )
-              })}
+            <div className="flex flex-wrap gap-1">
+              {IMAGERY.map((def) => (
+                <LayerPill
+                  key={def.id}
+                  name={def.name}
+                  active={layerById(def.id)?.visible ?? false}
+                  locked={!isPremium}
+                  onToggle={() => handleImagery(def.id)}
+                />
+              ))}
             </div>
           </section>
 
@@ -265,20 +212,15 @@ export default function WeatherSidebar({ open, onClose }: Props) {
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 px-0.5">
               Overlays
             </p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {OVERLAYS.map((def) => {
-                const overlay = overlayById(def.id)
-                return (
-                  <OverlayCard
-                    key={def.id}
-                    def={def}
-                    active={overlay?.visible ?? false}
-                    opacity={overlay?.opacity}
-                    onToggle={() => toggleOverlay(def.id)}
-                    onOpacity={(v) => setOverlayOpacity(def.id, v)}
-                  />
-                )
-              })}
+            <div className="flex flex-wrap gap-1">
+              {OVERLAYS.map((def) => (
+                <LayerPill
+                  key={def.id}
+                  name={def.name}
+                  active={overlayById(def.id)?.visible ?? false}
+                  onToggle={() => toggleOverlay(def.id)}
+                />
+              ))}
             </div>
           </section>
 
