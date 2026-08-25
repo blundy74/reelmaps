@@ -133,7 +133,7 @@ export default function WeatherRows() {
   const hourly = useWeatherStore((s) => s.hourly)
   const marine = useWeatherStore((s) => s.marine)
   const loading = useWeatherStore((s) => s.loading)
-  const selectedForecastHour = useWeatherStore((s) => s.selectedForecastHour)
+  const selectedForecastHour = useWeatherStore((s) => Math.floor(s.selectedForecastHour))
   const setSelectedForecastHour = useWeatherStore((s) => s.setSelectedForecastHour)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -142,7 +142,7 @@ export default function WeatherRows() {
     [hourly, marine],
   )
 
-  const selectedHourly = Math.floor(selectedForecastHour)
+  const selectedHourly = selectedForecastHour
   const selectedCol = useMemo(() => {
     if (!cols.length) return -1
     const exact = cols.findIndex((c) => c.hourlyIndex === selectedHourly)
@@ -205,7 +205,10 @@ export default function WeatherRows() {
       key: 'hours',
       label: 'Hours',
       render: (c) => (
-        <span className={cn('text-[9px] font-semibold', !c.entry.isDay && 'text-slate-400')}>
+        <span className={cn(
+          'text-[9px] font-semibold',
+          !c.entry.isDay && 'text-slate-400',
+        )}>
           {fmtHour(c.entry.time)}
         </span>
       ),
@@ -305,11 +308,11 @@ export default function WeatherRows() {
   return (
     <div>
       <div className="flex items-center gap-1.5 px-0.5 mb-1.5">
-        <span className="w-0.5 h-3 rounded-full bg-red-500 flex-shrink-0" />
-        <span className="text-[10px] font-semibold text-red-400 tracking-wide">
+        <span className="w-1.5 h-3 rounded-sm bg-red-500 flex-shrink-0 shadow-[0_0_6px_#ef4444]" />
+        <span className="text-[10px] font-bold text-red-400 tracking-wide">
           Time of forecast on map
         </span>
-        <span className="text-[10px] font-mono text-slate-400 ml-auto">{mapTime}</span>
+        <span className="text-[10px] font-mono text-cyan-200 ml-auto">{mapTime}</span>
       </div>
 
       <div ref={scrollRef} className="relative overflow-x-auto -mx-1 px-1">
@@ -353,20 +356,32 @@ export default function WeatherRows() {
 
           {selectedCol >= 0 && (
             <div
-              className="pointer-events-none absolute top-3 bottom-0 z-[15] bg-red-500/12 border-x border-red-500/35"
+              className="pointer-events-none absolute top-3 bottom-0 z-[15] bg-cyan-400/22 border-x-2 border-cyan-300 shadow-[inset_0_0_12px_rgba(34,211,238,0.25)]"
               style={{ left: LABEL_W + selectedCol * COL_W, width: COL_W }}
             />
           )}
 
-          {/* Now-tick dashed line — Windy red now-line, same rail */}
+          {/* Now-tick — solid red playhead, not a faint dashed grey */}
           {tickLeft != null && (
             <div
-              className="pointer-events-none absolute top-3 bottom-0 z-20"
+              className="pointer-events-none absolute top-2 bottom-0 z-20"
               style={{ left: tickLeft, width: 0 }}
             >
               <div
+                className="absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0"
+                style={{
+                  borderLeft: '5px solid transparent',
+                  borderRight: '5px solid transparent',
+                  borderTop: '7px solid #ef4444',
+                }}
+              />
+              <div
                 className="h-full"
-                style={{ borderLeft: '2px dashed #ef4444', marginLeft: -1 }}
+                style={{
+                  borderLeft: '2px solid #ef4444',
+                  marginLeft: -1,
+                  boxShadow: '0 0 8px 1px rgba(239,68,68,0.85)',
+                }}
               />
             </div>
           )}

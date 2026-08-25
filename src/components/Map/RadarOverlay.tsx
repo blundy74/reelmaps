@@ -14,7 +14,7 @@ import { useEffect, useRef, useMemo, useCallback } from 'react'
 import type maplibregl from 'maplibre-gl'
 import { fetchRainViewerFrames, rainViewerTileUrl, type RainViewerData } from '../../lib/weatherApi'
 import { fetchHrrrManifest, hrrrPrecipUrl } from '../../lib/layerUrls'
-import { useWeatherStore } from '../../store/weatherStore'
+import { useWeatherStore, selectOverlayHour } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
@@ -41,7 +41,7 @@ export default function RadarOverlay({ mapRef, mapReady }: Props) {
   const radarOpacity = useWeatherStore(
     (s) => s.overlays.find((o) => o.id === 'radar')?.opacity ?? 0.85,
   )
-  const forecastHour = useWeatherStore((s) => s.selectedForecastHour)
+  const forecastHour = useWeatherStore(selectOverlayHour)
 
   const framesRef = useRef<RainViewerData | null>(null)
   const lastRvIdx = useRef(-1)
@@ -112,19 +112,12 @@ export default function RadarOverlay({ mapRef, mapReady }: Props) {
       }
 
       if (hrrrFh !== lastForecastFh.current) {
-        map.setPaintProperty(FORECAST_LAYER, 'raster-opacity', 0)
         const src = map.getSource(FORECAST_SOURCE) as maplibregl.RasterTileSource
         if (src?.setTiles) src.setTiles([forecastTileUrl])
-        setTimeout(() => {
-          if (map.getLayer(FORECAST_LAYER)) {
-            map.setPaintProperty(FORECAST_LAYER, 'raster-opacity', opacityRef.current)
-          }
-        }, 50)
         lastForecastFh.current = hrrrFh
-      } else {
-        map.setLayoutProperty(FORECAST_LAYER, 'visibility', 'visible')
-        map.setPaintProperty(FORECAST_LAYER, 'raster-opacity', currentOpacity)
       }
+      map.setLayoutProperty(FORECAST_LAYER, 'visibility', 'visible')
+      map.setPaintProperty(FORECAST_LAYER, 'raster-opacity', currentOpacity)
       activeSource.current = 'forecast'
 
     } else if (hoursFromNow <= 0.5) {

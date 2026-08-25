@@ -88,9 +88,12 @@ export default function WindParticleCanvas({ mapRef, mapReady }: Props) {
     (s) => s.overlays.find((o) => o.id === 'wind')?.opacity ?? 0.8,
   )
   const forecastHourRef = useRef(0)
-  // Update ref on store change so animation loop reads latest without re-mounting
-  const forecastHour = useWeatherStore((s) => s.selectedForecastHour)
-  forecastHourRef.current = forecastHour
+  useEffect(() => {
+    forecastHourRef.current = useWeatherStore.getState().selectedForecastHour
+    return useWeatherStore.subscribe((s) => {
+      forecastHourRef.current = s.selectedForecastHour
+    })
+  }, [])
 
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current

@@ -16,7 +16,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import type maplibregl from 'maplibre-gl'
 import { fetchWaveGrid, interpolateWaveHeightAtHour, type WaveGrid } from '../../lib/windField'
 import { clipWavesToCoast } from '../../lib/landMask'
-import { useWeatherStore } from '../../store/weatherStore'
+import { useWeatherStore, selectOverlayHour } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
@@ -77,7 +77,10 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
   const wavesOpacity = useWeatherStore(
     (s) => s.overlays.find((o) => o.id === 'waves')?.opacity ?? 0.6,
   )
-  const forecastHour = useWeatherStore((s) => s.selectedForecastHour)
+  const forecastHour = useWeatherStore(selectOverlayHour)
+  const forecastHourRef = useRef(forecastHour)
+  forecastHourRef.current = forecastHour
+  const coastMaskRef = useRef<HTMLCanvasElement | null>(null)
 
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current
@@ -129,7 +132,7 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
         const fullPy = y * SCALE + SCALE / 2
         const lngLat = map.unproject([fullPx, fullPy])
 
-        const height = interpolateWaveHeightAtHour(lngLat.lat, lngLat.lng, grid, forecastHour)
+        const height = interpolateWaveHeightAtHour(lngLat.lat, lngLat.lng, grid, forecastHourRef.current)
 
         if (height < 0.01) {
           data[idx + 3] = 0
@@ -161,9 +164,26 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
     ctx.globalAlpha = 1
     ctx.filter = 'none'
 
-    // ── Step 3: Keep water only (basemap coastline, 10m land fallback) ──
-    await clipWavesToCoast(ctx, map, { inflatePx: 4, featherPx: 2 })
-  }, [mapRef, wavesOpacity, forecastHour])
+    // ── Step 3: Keep water only. Reuse the coast mask across hour ticks. ──
+    let mask = coastMaskRef.current
+    if (!mask || mask.width !== cw || mask.height !== ch) {
+      mask = document.createElement('canvas')
+      mask.width = cw
+      mask.height = ch
+      const mctx = mask.getContext('2d')
+      if (mctx) {
+        mctx.fillStyle = '#fff'
+        mctx.fillRect(0, 0, cw, ch)
+        await clipWavesToCoast(mctx, map, { inflatePx: 4, featherPx: 2 })
+        coastMaskRef.current = mask
+      }
+    }
+    if (mask) {
+      ctx.globalCompositeOperation = 'destination-in'
+      ctx.drawImage(mask, 0, 0)
+      ctx.globalCompositeOperation = 'source-over'
+    }
+  }, [mapRef, wavesOpacity])
 
   // Mount/unmount: set up map event listeners (does NOT depend on forecastHour)
   useEffect(() => {
@@ -182,17 +202,20 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
 
     const onMoveStart = () => {
       if (renderTimerRef.current) clearTimeout(renderTimerRef.current)
+      coastMaskRef.current = null
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
 
     const onMoveEnd = () => {
       if (renderTimerRef.current) clearTimeout(renderTimerRef.current)
+      coastMaskRef.current = null
       renderTimerRef.current = setTimeout(() => renderOverlay(), 300)
     }
 
     const onResize = () => {
       syncSize()
+      coastMaskRef.current = null
       if (renderTimerRef.current) clearTimeout(renderTimerRef.current)
       renderTimerRef.current = setTimeout(() => renderOverlay(), 300)
     }

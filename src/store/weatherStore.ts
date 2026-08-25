@@ -41,7 +41,7 @@ interface WeatherState {
   // Forecast hour index for overlay animation (0 = current, 1 = +1h, etc.)
   selectedForecastHour: number
 
-  // Playback speed: seconds per forecast hour (lower = faster)
+  // Playback speed: seconds per forecast hour (lower = faster). Default ~Windy.
   playbackSpeed: number
 
   // Unit system
@@ -100,7 +100,7 @@ export const useWeatherStore = create<WeatherState>()(
       overlays: DEFAULT_OVERLAYS,
       radarFrameIndex: -1,
       selectedForecastHour: 0,
-      playbackSpeed: 1.0,
+      playbackSpeed: 0.25,
       unitSystem: 'imperial' as UnitSystem,
       homePort: null as HomePort | null,
       defaultOverlayOpacity: 0.7,
@@ -173,3 +173,8 @@ export const useWeatherStore = create<WeatherState>()(
     },
   ),
 )
+
+/** Tile/canvas overlays re-render on whole hours only — skip fractional play ticks. */
+export function selectOverlayHour(s: { selectedForecastHour: number }): number {
+  return Math.round(s.selectedForecastHour)
+}

@@ -144,8 +144,12 @@ export default function WaveArrowOverlay({ mapRef, mapReady }: Props) {
     (s) => s.overlays.find((o) => o.id === 'waves')?.visible ?? false,
   )
   const forecastHourRef = useRef(0)
-  const forecastHour = useWeatherStore((s) => s.selectedForecastHour)
-  forecastHourRef.current = forecastHour
+  useEffect(() => {
+    forecastHourRef.current = useWeatherStore.getState().selectedForecastHour
+    return useWeatherStore.subscribe((s) => {
+      forecastHourRef.current = s.selectedForecastHour
+    })
+  }, [])
 
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current

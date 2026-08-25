@@ -82,7 +82,9 @@ export default function SettingsModal({ open, onClose }: Props) {
   // Wrapper that saves to API after changing a preference
   const handleUnitChange = (u: UnitSystem) => { setUnitSystem(u); setTimeout(persistPreferences, 100) }
   const handleBasemapChange = (id: BasemapId) => { setBasemap(id); setTimeout(persistPreferences, 100) }
-  const handlePlaybackChange = (v: number) => { setPlaybackSpeed(v) }
+  const handlePlaybackChange = (v: number) => {
+    setPlaybackSpeed(Math.min(1.25, Math.max(0.15, v)))
+  }
   const handleOpacityChange = (v: number) => { setDefaultOverlayOpacity(v) }
 
   return (
@@ -174,9 +176,9 @@ export default function SettingsModal({ open, onClose }: Props) {
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-slate-500 w-10">Slow</span>
                   <input
-                    type="range" min="0.25" max="3" step="0.25"
-                    value={playbackSpeed}
-                    onChange={(e) => handlePlaybackChange(parseFloat(e.target.value))}
+                    type="range" min="0.15" max="1.25" step="0.05"
+                    value={1.4 - playbackSpeed}
+                    onChange={(e) => handlePlaybackChange(1.4 - parseFloat(e.target.value))}
                     className="flex-1 h-1.5 bg-ocean-600 rounded-full appearance-none cursor-pointer
                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
                       [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
@@ -184,7 +186,7 @@ export default function SettingsModal({ open, onClose }: Props) {
                   />
                   <span className="text-xs text-slate-500 w-10 text-right">Fast</span>
                 </div>
-                <p className="text-xs text-slate-500 text-center mt-1">{playbackSpeed.toFixed(1)}s per hour</p>
+                <p className="text-xs text-slate-500 text-center mt-1">{playbackSpeed.toFixed(2)}s per hour</p>
               </div>
 
               {/* Weather Overlay Transparency */}
