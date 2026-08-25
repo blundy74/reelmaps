@@ -2,9 +2,9 @@
  * WaveArrowOverlay — animated wave particles with arched line shapes.
  * Faster and denser when waves are higher. No rendering over land.
  *
- * Land masking uses a pre-rendered bitmap from Natural Earth 50m land
- * polygons. The bitmap is rebuilt once per map move (cheap), and each
- * particle does a single pixel lookup per frame (nearly free).
+ * Land masking uses a pre-rendered bitmap from Natural Earth 10m land
+ * polygons (inflated a few pixels). The bitmap is rebuilt once per map
+ * move, and each particle does a single pixel lookup per frame.
  */
 
 import { useEffect, useRef, useCallback } from 'react'
@@ -15,7 +15,7 @@ import {
   invalidateWaveCache,
   type WaveGrid,
 } from '../../lib/windField'
-import { getLandData, drawLandMask } from '../../lib/landMask'
+import { paintLandMask } from '../../lib/landMask'
 import { useWeatherStore } from '../../store/weatherStore'
 
 interface Props {
@@ -106,21 +106,19 @@ interface LandMaskBitmap {
 }
 
 /**
- * Render Natural Earth land polygons to a 1-bit-per-pixel bitmap.
- * Pixels under land have alpha > 0.  Checked per-particle each frame.
+ * Render land as opaque pixels so particles can do a cheap alpha lookup.
+ * Prefers the basemap water layer (inverted); falls back to Natural Earth 10m.
  */
 async function buildLandMaskBitmap(
   map: maplibregl.Map,
   cw: number,
   ch: number,
 ): Promise<LandMaskBitmap> {
-  const land = await getLandData()
   const offscreen = document.createElement('canvas')
   offscreen.width = cw
   offscreen.height = ch
   const ctx = offscreen.getContext('2d')!
-  ctx.fillStyle = 'rgba(255,0,0,1)'
-  drawLandMask(ctx, map, land)
+  await paintLandMask(ctx, map, { inflatePx: 4 })
   const imageData = ctx.getImageData(0, 0, cw, ch)
   return { data: imageData.data, width: cw, height: ch }
 }

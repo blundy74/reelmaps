@@ -4,17 +4,18 @@
  * Renders an ocean-blue gradient on a canvas overlay, using bilinear-interpolated
  * wave height data from Open-Meteo.
  *
- * Coastline clipping uses the Windy.com technique:
+ * Coastline clipping:
  *   1. Draw wave colours across the full viewport (including over land)
- *   2. Set globalCompositeOperation = 'destination-out'
- *   3. Fill Natural Earth land polygons → erases all wave pixels on land
- *   4. Result: pixel-perfect coastline boundary
+ *   2. Soften the field with a small blur
+ *   3. destination-in the basemap's OSM water polygons so the overlay follows
+ *      the same shoreline as the map (Mobile Bay, barrier islands). Falls back
+ *      to inflated Natural Earth 10m land if that layer is missing.
  */
 
 import { useEffect, useRef, useCallback } from 'react'
 import type maplibregl from 'maplibre-gl'
 import { fetchWaveGrid, interpolateWaveHeightAtHour, type WaveGrid } from '../../lib/windField'
-import { getLandData, drawLandMask } from '../../lib/landMask'
+import { clipWavesToCoast } from '../../lib/landMask'
 import { useWeatherStore } from '../../store/weatherStore'
 
 interface Props {
@@ -107,8 +108,6 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
       grid = await fetchWaveGrid(bounds.getSouth(), bounds.getNorth(), bounds.getWest(), bounds.getEast())
     } catch { return }
 
-    const land = await getLandData()
-
     const sw = Math.ceil(cw / SCALE)
     const sh = Math.ceil(ch / SCALE)
 
@@ -154,7 +153,7 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
     ctx.imageSmoothingQuality = 'high'
 
     if (typeof ctx.filter !== 'undefined') {
-      ctx.filter = 'blur(4px)'
+      ctx.filter = 'blur(2px)'
     }
 
     ctx.globalAlpha = wavesOpacity
@@ -162,14 +161,8 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
     ctx.globalAlpha = 1
     ctx.filter = 'none'
 
-    // ── Step 3: Erase land pixels using Natural Earth polygons ───────────
-    // 'destination-out' means: anywhere we draw becomes transparent,
-    // erasing the wave colours beneath. This is how Windy.com clips
-    // ocean data at the coastline.
-    ctx.globalCompositeOperation = 'destination-out'
-    ctx.fillStyle = 'rgba(0,0,0,1)'
-    drawLandMask(ctx, map, land)
-    ctx.globalCompositeOperation = 'source-over'
+    // ── Step 3: Keep water only (basemap coastline, 10m land fallback) ──
+    await clipWavesToCoast(ctx, map, { inflatePx: 4, featherPx: 2 })
   }, [mapRef, wavesOpacity, forecastHour])
 
   // Mount/unmount: set up map event listeners (does NOT depend on forecastHour)
@@ -185,7 +178,6 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
     }
 
     syncSize()
-    getLandData()
     setTimeout(() => renderOverlay(), 100)
 
     const onMoveStart = () => {
