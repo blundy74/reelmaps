@@ -113,8 +113,8 @@ export async function fetchForecast(lat: number, lng: number): Promise<ForecastR
   // Start 8 hours before the current hour for past data playback.
   const PAST_HOURS = 8
   const startIndex = Math.max(0, nowIndex - PAST_HOURS)
-  // 26 total hours: 8h past + 18h future
-  const TOTAL_HOURS = 26
+  // 8h past + 72h future — enough 3-hour columns for a 3-day Windy-style row set
+  const TOTAL_HOURS = 80
   const hourly: HourlyEntry[] = data.hourly.time.slice(startIndex, startIndex + TOTAL_HOURS).map((t: string, idx: number) => {
     const i = startIndex + idx
     return {

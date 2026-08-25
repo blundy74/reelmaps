@@ -65,7 +65,7 @@ export default function MapApp() {
         <main className={`relative flex-1 overflow-hidden ${forecastBarOpen ? 'forecast-bar-open' : ''}`}>
           <FishingMap />
           <AlertBanner />
-          <ColorLegend forecastBarOpen={forecastBarOpen} />
+          <ColorLegend forecastBarOpen={forecastBarOpen} hidden={weatherRightOpen} />
 
           {/* Floating fish icon — toggle left sidebar */}
           <button

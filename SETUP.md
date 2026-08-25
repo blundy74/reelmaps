@@ -68,7 +68,7 @@ reelmaps/
 | Salinity (SMAP) | NASA GIBS WMS | gibs.earthdata.nasa.gov |
 | Ocean Currents (OSCAR) | NASA GIBS WMS | gibs.earthdata.nasa.gov |
 | Sea Height / Eddies | NASA GIBS WMS | gibs.earthdata.nasa.gov |
-| GOES SST (Near Real-Time) | NOAA ERDDAP WMS | cwcgom.aoml.noaa.gov |
+| SST Daily Pass (VIIRS S-NPP L2) | NASA GIBS WMS | gibs.earthdata.nasa.gov |
 | Bathymetry | GEBCO WMS | gebco.net |
 | Nautical Charts | NOAA Chart Display | gis.charttools.noaa.gov |
 | Nautical Symbols | OpenSeaMap XYZ | tiles.openseamap.org |

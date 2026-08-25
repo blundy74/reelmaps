@@ -56,7 +56,8 @@ export default function BottomWeatherBar() {
   const tickRef = useRef(0)
 
   useEffect(() => {
-    if (playing && hourly.length > 0) {
+    const barLen = Math.min(hourly.length, 26)
+    if (playing && barLen > 0) {
       const ticksPerHour = Math.max(4, Math.round((playbackSpeed * 1000) / TICK_MS))
       tickRef.current = selectedIndex * ticksPerHour
       playRef.current = setInterval(() => {
@@ -64,7 +65,7 @@ export default function BottomWeatherBar() {
         const fractionalHour = tickRef.current / ticksPerHour
         const wholeHour = Math.floor(fractionalHour)
 
-        if (wholeHour >= hourly.length) {
+        if (wholeHour >= barLen) {
           // Loop back to the beginning
           tickRef.current = 0
           setSelectedIndex(0)
@@ -101,7 +102,7 @@ export default function BottomWeatherBar() {
     if (playing) {
       setPlaying(false)
     } else {
-      if (selectedIndex >= hourly.length - 1) {
+      if (selectedIndex >= Math.min(hourly.length, 26) - 1) {
         setSelectedIndex(0)
         setSelectedForecastHour(0)
       }
@@ -111,7 +112,9 @@ export default function BottomWeatherBar() {
 
   if (!panelOpen || loading || !hourly.length) return null
 
-  const selected = hourly[selectedIndex]
+  const timeline = hourly.slice(0, 26)
+  const selected = timeline[Math.min(selectedIndex, timeline.length - 1)]
+  if (!selected) return null
   const selectedDate = new Date(selected.time)
   const wmo = WMO_CODES[selected.weatherCode] ?? { icon: '?', label: 'Unknown' }
 
@@ -184,8 +187,8 @@ export default function BottomWeatherBar() {
 
       {/* Hourly scroll timeline */}
       <div className="overflow-x-auto px-4 pb-2" ref={scrollRef}>
-        <div className="flex gap-0.5" style={{ minWidth: hourly.length * 44 }}>
-          {hourly.map((h, i) => {
+        <div className="flex gap-0.5" style={{ minWidth: timeline.length * 44 }}>
+          {timeline.map((h, i) => {
             const date = new Date(h.time)
             const hour = date.getHours()
             const isSelected = i === selectedIndex

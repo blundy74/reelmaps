@@ -48,7 +48,7 @@ function wmsParams(params: Record<string, string>): string {
 // NASA GIBS — free, no API key, WMS
 // ---------------------------------------------------------------------------
 
-/** MUR Sea Surface Temperature — 1 km, daily, global */
+/** MUR L4 cloud-free SST analysis — 1 km, daily, global (not the break-hero pass). */
 export function sstMurUrl(date: string): string {
   return `${GIBS_WMS}?${wmsParams({
     LAYERS: 'GHRSST_L4_MUR_Sea_Surface_Temperature',
@@ -184,10 +184,17 @@ export function sargassumDailyUrl(date: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// NASA GIBS — GOES-East geostationary SST
+// NASA GIBS — VIIRS daily-pass SST (layer id `sst-goes` is historical)
 // ---------------------------------------------------------------------------
+// Verified 2026-08-25 against GIBS WMTS GetCapabilities (epsg3857/best) and
+// GetMap probes: the only VIIRS L2 SST layers in GIBS are
+//   VIIRS_SNPP_L2_Sea_Surface_Temp_Day / _Night
+// VIIRS_NOAA20_L2_Sea_Surface_Temp_Day and VIIRS_NOAA21_L2_Sea_Surface_Temp_Day
+// are not published (GetMap returns WMS exception XML). Do NOT point this at
+// GOES-East/GOES-19 ABI, ACSPO fronts, or a range chip. Keep SNPP L2 until
+// NASA GIBS adds N20/N21 VIIRS SST.
 
-/** VIIRS SNPP SST Day — global, ~1 km, daily (replaces broken GOES SST) */
+/** VIIRS S-NPP L2 daytime SST — ~1 km daily pass (clouds punch holes). */
 export function sstGoesUrl(date: string): string {
   return `${GIBS_WMS}?${wmsParams({
     LAYERS: 'VIIRS_SNPP_L2_Sea_Surface_Temp_Day',
@@ -313,8 +320,8 @@ export interface LayerDef {
 export const LAYER_REGISTRY: LayerDef[] = [
   {
     id: 'sst-mur',
-    name: 'Sea Surface Temp (SST)',
-    description: 'NASA MUR — 1 km daily global SST. Shows water temperature breaks critical for finding fish.',
+    name: 'SST Analysis (MUR)',
+    description: 'NASA MUR L4 — 1 km daily cloud-free SST analysis blended from multiple sensors. Use this for a complete temperature picture through clouds, not as the break-hunting pass.',
     group: 'satellite',
     sourceType: 'raster-wms',
     dateDependent: true,
@@ -350,7 +357,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
   {
     id: 'chlorophyll',
     name: 'Chlorophyll (Daily)',
-    description: 'Phytoplankton / ocean color (VIIRS NOAA-20) — 1 km daily. High chlorophyll = productive water = baitfish = gamefish.',
+    description: 'Phytoplankton / ocean color (VIIRS NOAA-20) — 1 km daily. Pelagic gamefish (GOM sailfish, tuna, wahoo) hunt the blue-water side of a color break — not the high-chl green water itself.',
     group: 'satellite',
     sourceType: 'raster-wms',
     dateDependent: true,
@@ -359,7 +366,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
   {
     id: 'chlorophyll-7day',
     name: 'Chlorophyll 7-Day Avg',
-    description: '7-day composite of chlorophyll-a — fills cloud gaps by stacking the last 7 daily satellite passes. Best for finding persistent productive water.',
+    description: '7-day composite of chlorophyll-a — fills cloud gaps by stacking the last 7 daily satellite passes. Use it to find persistent color breaks; fish the clean blue side, not the bloom.',
     group: 'satellite',
     sourceType: 'raster-wms',
     dateDependent: true,
@@ -412,12 +419,12 @@ export const LAYER_REGISTRY: LayerDef[] = [
   },
   {
     id: 'sst-goes',
-    name: 'SST Daily (VIIRS)',
-    description: 'VIIRS S-NPP sea surface temperature — daily daytime pass, ~1 km global coverage.',
+    name: 'SST Daily Pass (VIIRS)',
+    description: 'VIIRS S-NPP daytime SST — daily satellite pass at ~1 km. Clouds leave gaps; this is the break-hunting layer. Use MUR for the cloud-free analysis.',
     group: 'satellite',
     sourceType: 'raster-wms',
     dateDependent: true,
-    attribution: 'NOAA GOES-East via NASA GIBS',
+    attribution: 'VIIRS S-NPP via NASA GIBS',
   },
   {
     id: 'bathymetry',
