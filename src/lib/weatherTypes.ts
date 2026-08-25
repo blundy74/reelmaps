@@ -125,6 +125,34 @@ export function windToBeaufort(mph: number): { force: number; label: string } {
   return { force: 12, label: 'Hurricane' }
 }
 
+/** mph → knots (Windy Basic / marine convention) */
+export function mphToKnots(mph: number): number {
+  return mph * 0.868976
+}
+
+/** Windy-style heat color for wind or gust cells (input: knots).
+ *  Matches Windy Basic: blue 2–9, green 10–15, yellow 16–20, then orange/red. */
+export function windHeatColor(kt: number): { bg: string; fg: string } {
+  if (kt < 2) return { bg: '#0d47a1', fg: '#e3f2fd' }
+  if (kt < 10) return { bg: '#0288d1', fg: '#ffffff' }
+  if (kt < 16) return { bg: '#43a047', fg: '#ffffff' }
+  if (kt < 21) return { bg: '#fdd835', fg: '#111827' }
+  if (kt < 24) return { bg: '#fb8c00', fg: '#111827' }
+  if (kt < 28) return { bg: '#f4511e', fg: '#ffffff' }
+  if (kt < 35) return { bg: '#d32f2f', fg: '#ffffff' }
+  return { bg: '#ad1457', fg: '#ffffff' }
+}
+
+/** Sea-state heat color for wave-height cells (input: feet). */
+export function seasHeatColor(ft: number): { bg: string; fg: string } {
+  if (ft < 1.5) return { bg: '#1b5e32', fg: '#e8f5e9' }
+  if (ft < 3) return { bg: '#2e7d32', fg: '#ffffff' }
+  if (ft < 5) return { bg: '#c0ca33', fg: '#111827' }
+  if (ft < 8) return { bg: '#fb8c00', fg: '#111827' }
+  if (ft < 12) return { bg: '#f4511e', fg: '#ffffff' }
+  return { bg: '#d32f2f', fg: '#ffffff' }
+}
+
 /** Sea state from wave height (ft) */
 export function waveHeightToSeaState(ft: number): { state: number; label: string } {
   if (ft < 0.33) return { state: 0, label: 'Glassy' }

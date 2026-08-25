@@ -60,17 +60,25 @@ const DEFAULT_OPACITY: Record<string, number> = {
   'fishing-spots': 1.0,
 }
 
+function mergeLayersFromRegistry(prev?: MapLayer[]): MapLayer[] {
+  const byId = new Map((prev ?? []).map((l) => [l.id, l]))
+  return LAYER_REGISTRY.map((def) => {
+    const old = byId.get(def.id)
+    return {
+      id: def.id,
+      name: def.name,
+      description: def.description,
+      group: def.group,
+      visible: old?.visible ?? DEFAULT_VISIBLE[def.id] ?? false,
+      opacity: old?.opacity ?? DEFAULT_OPACITY[def.id] ?? 0.8,
+      hasDateControl: def.dateDependent,
+      attribution: def.attribution,
+    }
+  })
+}
+
 function buildInitialLayers(): MapLayer[] {
-  return LAYER_REGISTRY.map((def) => ({
-    id: def.id,
-    name: def.name,
-    description: def.description,
-    group: def.group,
-    visible: DEFAULT_VISIBLE[def.id] ?? false,
-    opacity: DEFAULT_OPACITY[def.id] ?? 0.8,
-    hasDateControl: def.dateDependent,
-    attribution: def.attribution,
-  }))
+  return mergeLayersFromRegistry()
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +207,34 @@ export const useMapStore = create<MapState>()(
     }),
     {
       name: 'reelmaps-map-state',
-      version: 10,
+      version: 11,
+      migrate: (persisted) => {
+        const state = persisted as {
+          layers?: MapLayer[]
+          basemap?: MapState['basemap']
+          selectedDate?: string
+          sidebarOpen?: boolean
+          viewState?: MapState['viewState']
+          droppedPin?: MapState['droppedPin']
+        }
+        return {
+          layers: mergeLayersFromRegistry(state.layers),
+          basemap: state.basemap ?? 'satellite',
+          selectedDate: state.selectedDate ?? toISODate(getDefaultDate()),
+          sidebarOpen: state.sidebarOpen ?? true,
+          viewState: state.viewState ?? {
+            longitude: -80,
+            latitude: 30,
+            zoom: 4,
+            bearing: 0,
+            pitch: 0,
+          },
+          droppedPin: state.droppedPin ?? null,
+        }
+      },
+      onRehydrateStorage: () => (state) => {
+        if (state) state.layers = mergeLayersFromRegistry(state.layers)
+      },
       partialize: (state) => ({
         layers: state.layers,
         basemap: state.basemap,

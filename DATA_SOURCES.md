@@ -159,6 +159,8 @@ NASA GIBS provides pre-rendered SST tiles via WMTS — the easiest way to add a 
 | `VIIRS_SNPP_L2_Sea_Surface_Temp_Day` | 1 km | near real-time | PNG |
 | `VIIRS_SNPP_L2_Sea_Surface_Temp_Night` | 1 km | near real-time | PNG |
 
+Note (verified 2026-08-25): GIBS does **not** publish NOAA-20 or NOAA-21 VIIRS L2 SST (`VIIRS_NOAA20_L2_Sea_Surface_Temp_Day` / `VIIRS_NOAA21_L2_Sea_Surface_Temp_Day` fail GetMap). Daily-pass SST in-app uses S-NPP L2, labelled as VIIRS — not GOES.
+
 **WMTS REST Tile URL Pattern (EPSG:4326):**
 ```
 https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/{LayerID}/default/{YYYY-MM-DD}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.png
@@ -252,7 +254,7 @@ https://worldview.earthdata.nasa.gov/
 
 ## 3. Chlorophyll-a (Ocean Color)
 
-Chlorophyll concentration indicates phytoplankton density — the base of the food chain. High chl-a "green water" edges and transitions into "blue water" are prime fishing locations for mahi, tuna, and wahoo.
+Chlorophyll concentration indicates phytoplankton density — the base of the food chain. Color-break *edges* (green water meeting clear blue) are prime for mahi, tuna, wahoo, and GOM sailfish. Pelagic gamefish hunt the blue-water side of the break, not the high-chl bloom itself.
 
 ### 3a. NASA GIBS — Chlorophyll WMTS Tiles
 

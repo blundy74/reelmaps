@@ -6,7 +6,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import type maplibregl from 'maplibre-gl'
 import { fetchWindGrid, interpolateWindAtHour, windSpeed, type WindGrid } from '../../lib/windField'
-import { useWeatherStore } from '../../store/weatherStore'
+import { useWeatherStore, selectOverlayHour } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
@@ -80,7 +80,9 @@ export default function WindColorOverlay({ mapRef, mapReady }: Props) {
   const windOpacity = useWeatherStore(
     (s) => s.overlays.find((o) => o.id === 'wind')?.opacity ?? 0.2,
   )
-  const forecastHour = useWeatherStore((s) => s.selectedForecastHour)
+  const forecastHour = useWeatherStore(selectOverlayHour)
+  const forecastHourRef = useRef(forecastHour)
+  forecastHourRef.current = forecastHour
 
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current
@@ -127,7 +129,7 @@ export default function WindColorOverlay({ mapRef, mapReady }: Props) {
         const px = x * SCALE + SCALE / 2
         const py = y * SCALE + SCALE / 2
         const lngLat = map.unproject([px, py])
-        const wind = interpolateWindAtHour(lngLat.lat, lngLat.lng, grid, forecastHour)
+        const wind = interpolateWindAtHour(lngLat.lat, lngLat.lng, grid, forecastHourRef.current)
         const speed = windSpeed(wind)
         const [r, g, b] = windSpeedColor(speed)
 
@@ -154,7 +156,7 @@ export default function WindColorOverlay({ mapRef, mapReady }: Props) {
     ctx.drawImage(offscreen, 0, 0, sw, sh, 0, 0, cw, ch)
     ctx.globalAlpha = 1
     ctx.filter = 'none'
-  }, [mapRef, windOpacity, forecastHour])
+  }, [mapRef, windOpacity])
 
   useEffect(() => {
     const map = mapRef.current
@@ -199,7 +201,12 @@ export default function WindColorOverlay({ mapRef, mapReady }: Props) {
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
-  }, [mapRef, windVisible, windOpacity, forecastHour, syncSize, renderOverlay, mapReady])
+  }, [mapRef, windVisible, windOpacity, syncSize, renderOverlay, mapReady])
+
+  useEffect(() => {
+    if (!windVisible) return
+    renderOverlay()
+  }, [forecastHour, windVisible, renderOverlay])
 
   return (
     <canvas

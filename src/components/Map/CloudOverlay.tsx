@@ -6,7 +6,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import type maplibregl from 'maplibre-gl'
 import { fetchWindGrid, bilinearInterp, type WindGrid } from '../../lib/windField'
-import { useWeatherStore } from '../../store/weatherStore'
+import { useWeatherStore, selectOverlayHour } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
@@ -25,7 +25,9 @@ export default function CloudOverlay({ mapRef, mapReady }: Props) {
   const cloudOpacity = useWeatherStore(
     (s) => s.overlays.find((o) => o.id === 'cloud-cover')?.opacity ?? 0.5,
   )
-  const forecastHour = useWeatherStore((s) => s.selectedForecastHour)
+  const forecastHour = useWeatherStore(selectOverlayHour)
+  const forecastHourRef = useRef(forecastHour)
+  forecastHourRef.current = forecastHour
 
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current
@@ -68,9 +70,10 @@ export default function CloudOverlay({ mapRef, mapReady }: Props) {
     const data = imageData.data
 
     // Pick the two bounding hours for interpolation
-    const h0 = Math.floor(forecastHour)
+    const hour = forecastHourRef.current
+    const h0 = Math.floor(hour)
     const h1 = Math.min(h0 + 1, grid.hours - 1)
-    const t = forecastHour - h0
+    const t = hour - h0
     const clampH = (h: number) => Math.max(0, Math.min(h, grid.hours - 1))
     const cloudData0 = grid.cloudCoverByHour[clampH(h0)]
     const cloudData1 = grid.cloudCoverByHour[clampH(h1)]
@@ -114,7 +117,7 @@ export default function CloudOverlay({ mapRef, mapReady }: Props) {
     ctx.drawImage(offscreen, 0, 0, sw, sh, 0, 0, cw, ch)
     ctx.globalAlpha = 1
     ctx.filter = 'none'
-  }, [mapRef, cloudOpacity, forecastHour])
+  }, [mapRef, cloudOpacity])
 
   useEffect(() => {
     const map = mapRef.current
@@ -159,7 +162,12 @@ export default function CloudOverlay({ mapRef, mapReady }: Props) {
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
-  }, [mapRef, cloudVisible, cloudOpacity, forecastHour, syncSize, renderOverlay, mapReady])
+  }, [mapRef, cloudVisible, cloudOpacity, syncSize, renderOverlay, mapReady])
+
+  useEffect(() => {
+    if (!cloudVisible) return
+    renderOverlay()
+  }, [forecastHour, cloudVisible, renderOverlay])
 
   return (
     <canvas

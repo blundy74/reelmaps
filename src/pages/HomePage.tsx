@@ -58,7 +58,7 @@ const FEATURES = [
       </svg>
     ),
     title: 'Sea Surface Temperature',
-    description: 'NASA MUR SST at 1km resolution — the gold standard. See temperature breaks in real-time, identify the warm side of the Gulf Stream edge, track Loop Current eddies, and find the exact water temp ranges your target species prefer. Updated daily from multiple satellite sensors for cloud-free coverage.',
+    description: 'NASA MUR SST at 1km — a daily cloud-free analysis blended from multiple sensors. See the full temperature field through clouds, track Loop Current eddies, and find species temp ranges. Pair it with the VIIRS daily pass when you are hunting breaks.',
   },
   {
     icon: (
@@ -68,7 +68,7 @@ const FEATURES = [
       </svg>
     ),
     title: 'Chlorophyll & Ocean Color',
-    description: 'VIIRS satellite chlorophyll-a shows where the food chain starts. Find color breaks — the transition from clean blue to productive green water — where predators patrol. Includes single-day and 7-day composite views that fill in cloud gaps for a complete picture of ocean productivity.',
+    description: 'VIIRS chlorophyll-a shows where the food chain starts. Find color breaks — the edge from clean blue to greener water. GOM sailfish, tuna, and wahoo patrol the blue-water side of that edge, not the high-chl bloom. Daily and 7-day composites fill cloud gaps.',
   },
   {
     icon: (
@@ -601,11 +601,11 @@ const FAQ_ITEMS = [
     questions: [
       {
         q: 'What SST data do you use?',
-        a: 'We use NASA\'s GHRSST MUR (Multi-scale Ultra-high Resolution) SST product at 1km resolution — the gold standard for fishing. It\'s a foundation SST dataset that merges data from multiple satellite sensors (MODIS, VIIRS, AMSR2, and others) to produce a cloud-free daily global map. The VIIRS SNPP daily SST layer is also available for a single-pass view.',
+        a: 'We use NASA\'s GHRSST MUR (Multi-scale Ultra-high Resolution) SST product at 1km resolution — a cloud-free daily analysis blended from multiple sensors (MODIS, VIIRS, AMSR2, and others). That is the complete-picture layer, not the break-hero. A VIIRS daily-pass SST layer is also available for a single-overpass view of temperature structure; clouds leave gaps in that pass.',
       },
       {
         q: 'What does the chlorophyll layer show?',
-        a: 'Chlorophyll-a concentration in mg/m³, measured by the VIIRS satellite sensor. Chlorophyll is a proxy for phytoplankton — the base of the marine food chain. High chlorophyll (green water) means productive water with baitfish. The key for fishing is finding the EDGE between clean blue water and green productive water — that\'s where predators hunt. We offer both daily and 7-day composite views.',
+        a: 'Chlorophyll-a concentration in mg/m³, measured by the VIIRS satellite sensor — a proxy for phytoplankton. For pelagic blue-water (GOM sailfish, tuna, wahoo) high chlorophyll is not the bite: predators patrol the clean blue-water side of a color break, where green productive water meets clear blue. The bloom itself is often too turbid for visual hunters. We offer daily and 7-day composite views to find those edges through clouds.',
       },
       {
         q: 'How do ocean currents and altimetry help fishing?',

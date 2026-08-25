@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useWeatherStore } from '../../store/weatherStore'
 import { useMapStore } from '../../store/mapStore'
-import { WMO_CODES, degreesToCardinal, getWeatherIcon } from '../../lib/weatherTypes'
+import { degreesToCardinal, getWeatherIcon } from '../../lib/weatherTypes'
 import { cn } from '../../lib/utils'
 
 export default function BottomWeatherBar() {
@@ -27,8 +27,14 @@ export default function BottomWeatherBar() {
 
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const playRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const playingRef = useRef(false)
+  playingRef.current = playing
+  const hourRef = useRef(0)
+  const selectedIndexRef = useRef(0)
+  selectedIndexRef.current = selectedIndex
   const scrollRef = useRef<HTMLDivElement>(null)
+  const playheadLineRef = useRef<HTMLDivElement>(null)
+  const progressFillRef = useRef<HTMLDivElement>(null)
 
   // Auto-fetch weather when pin/click changes
   useEffect(() => {
@@ -42,7 +48,6 @@ export default function BottomWeatherBar() {
   useEffect(() => {
     if (!panelOpen || current || loading || location || initialFetchDone.current) return
     initialFetchDone.current = true
-    // Wait for map to render before fetching weather
     const timer = setTimeout(() => {
       const { viewState } = useMapStore.getState()
       fetchWeather(viewState.latitude, viewState.longitude)
@@ -50,60 +55,75 @@ export default function BottomWeatherBar() {
     return () => clearTimeout(timer)
   }, [panelOpen, current, loading, location, fetchWeather])
 
-  // Smooth play animation — updates fractional forecast hour for smooth overlay transitions
-  // playbackSpeed: 1.0 = 1 second per hour, 0.5 = half second, 2.0 = 2 seconds
-  const TICK_MS = 50
-  const tickRef = useRef(0)
-
+  // Keep the playhead in sync when the user picks a column (or the rail table)
   useEffect(() => {
-    if (playing && hourly.length > 0) {
-      const ticksPerHour = Math.max(4, Math.round((playbackSpeed * 1000) / TICK_MS))
-      tickRef.current = selectedIndex * ticksPerHour
-      playRef.current = setInterval(() => {
-        tickRef.current += 1
-        const fractionalHour = tickRef.current / ticksPerHour
-        const wholeHour = Math.floor(fractionalHour)
-
-        if (wholeHour >= hourly.length) {
-          // Loop back to the beginning
-          tickRef.current = 0
-          setSelectedIndex(0)
-          setSelectedForecastHour(0)
-          return
-        }
-
-        // Update the overlay forecast hour (fractional for smooth blending)
-        setSelectedForecastHour(fractionalHour)
-
-        // Update the selected index only on whole hour boundaries
-        if (wholeHour !== selectedIndex) {
-          setSelectedIndex(wholeHour)
-        }
-      }, TICK_MS)
+    if (playing) return
+    const i = Math.max(0, Math.min(Math.round(selectedForecastHour), Math.min(hourly.length, 26) - 1))
+    if (Number.isFinite(i) && i >= 0) {
+      setSelectedIndex(i)
+      hourRef.current = i
     }
-    return () => {
-      if (playRef.current) clearInterval(playRef.current)
+  }, [selectedForecastHour, playing, hourly.length])
+
+  // rAF playback — seconds-per-hour from settings (default 0.25s ≈ Windy)
+  useEffect(() => {
+    if (!playing) return
+    const barLen = Math.min(hourly.length, 26)
+    if (barLen <= 0) return
+
+    let raf = 0
+    let last = performance.now()
+    hourRef.current = selectedIndexRef.current
+
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000)
+      last = now
+      const secPerHour = Math.max(0.12, playbackSpeed)
+      hourRef.current += dt / secPerHour
+      if (hourRef.current >= barLen) hourRef.current = 0
+
+      const whole = Math.min(barLen - 1, Math.floor(hourRef.current))
+      const frac = hourRef.current - whole
+
+      if (playheadLineRef.current) playheadLineRef.current.style.left = `${frac * 100}%`
+      if (progressFillRef.current) progressFillRef.current.style.width = `${frac * 100}%`
+
+      // Push whole hours to the store so map overlays don't rebuild mid-hour
+      const storeHour = Math.floor(useWeatherStore.getState().selectedForecastHour)
+      if (whole !== storeHour) {
+        setSelectedForecastHour(whole)
+        setSelectedIndex(whole)
+      }
+
+      raf = requestAnimationFrame(tick)
     }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
   }, [playing, hourly.length, playbackSpeed, setSelectedForecastHour])
 
-  // Auto-scroll to selected index — buttons are inside a nested wrapper div
+  // Auto-scroll to selected index — skip smooth scrolling while playing
   useEffect(() => {
-    if (scrollRef.current && selectedIndex >= 0) {
-      const wrapper = scrollRef.current.firstElementChild
-      const child = wrapper?.children[selectedIndex] as HTMLElement
-      if (child) {
-        child.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-      }
-    }
+    if (!scrollRef.current || selectedIndex < 0) return
+    const wrapper = scrollRef.current.firstElementChild
+    const child = wrapper?.children[selectedIndex] as HTMLElement | undefined
+    if (!child) return
+    child.scrollIntoView({
+      behavior: playingRef.current ? 'auto' : 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    })
   }, [selectedIndex])
 
   const togglePlay = useCallback(() => {
     if (playing) {
       setPlaying(false)
+      setSelectedForecastHour(Math.floor(hourRef.current))
     } else {
-      if (selectedIndex >= hourly.length - 1) {
+      const barLen = Math.min(hourly.length, 26)
+      if (selectedIndex >= barLen - 1) {
         setSelectedIndex(0)
         setSelectedForecastHour(0)
+        hourRef.current = 0
       }
       setPlaying(true)
     }
@@ -111,32 +131,19 @@ export default function BottomWeatherBar() {
 
   if (!panelOpen || loading || !hourly.length) return null
 
-  const selected = hourly[selectedIndex]
+  const timeline = hourly.slice(0, 26)
+  const selected = timeline[Math.min(selectedIndex, timeline.length - 1)]
+  if (!selected) return null
   const selectedDate = new Date(selected.time)
-  const wmo = WMO_CODES[selected.weatherCode] ?? { icon: '?', label: 'Unknown' }
-
-  // Build day boundaries for labels
-  const dayBoundaries: { index: number; label: string }[] = []
-  let lastDay = ''
-  hourly.forEach((h, i) => {
-    const d = new Date(h.time)
-    const dayStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    if (dayStr !== lastDay) {
-      dayBoundaries.push({ index: i, label: dayStr })
-      lastDay = dayStr
-    }
-  })
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-30 bg-ocean-900/95 backdrop-blur-md border-t border-ocean-700">
-      {/* Date label + selected stats */}
       <div className="flex items-center gap-3 px-4 py-2">
-        {/* Play button */}
         <button
           onClick={togglePlay}
           className={cn(
             'flex items-center justify-center w-8 h-8 rounded-full transition-all flex-shrink-0',
-            playing ? 'bg-cyan-500 text-white' : 'bg-ocean-700 text-slate-300 hover:bg-ocean-600',
+            playing ? 'bg-cyan-400 text-ocean-950' : 'bg-ocean-700 text-slate-300 hover:bg-ocean-600',
           )}
         >
           {playing ? (
@@ -151,41 +158,37 @@ export default function BottomWeatherBar() {
           )}
         </button>
 
-        {/* Date/time label */}
-        <div className="bg-cyan-500/15 border border-cyan-500/30 rounded-lg px-3 py-1 flex-shrink-0">
-          <span className="text-xs font-bold text-cyan-300">
+        <div className="bg-cyan-400 border border-cyan-200 rounded-lg px-3 py-1 flex-shrink-0">
+          <span className="text-xs font-bold text-ocean-950">
             {selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             {' '}
             {selectedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
           </span>
         </div>
 
-        {/* Selected hour quick stats */}
-        <div className="hidden sm:flex items-center gap-3 text-xs text-slate-300 overflow-hidden">
+        <div className="hidden sm:flex items-center gap-3 text-xs text-slate-200 overflow-hidden">
           <span>{getWeatherIcon(selected.weatherCode, selected.isDay)} {Math.round(selected.temperature)}°F</span>
           <div className="flex items-center gap-0.5">
             <svg width="8" height="8" viewBox="0 0 10 10" style={{ transform: `rotate(${selected.windDirection + 180}deg)` }}>
-              <polygon points="5,0 3,8 5,6 7,8" fill="#06b6d4" />
+              <polygon points="5,0 3,8 5,6 7,8" fill="#22d3ee" />
             </svg>
             <span className="font-mono">{Math.round(selected.windSpeed)} mph {degreesToCardinal(selected.windDirection)}</span>
           </div>
           {selected.precipProbability > 0 && (
-            <span className="text-blue-400 font-mono">{selected.precipProbability}% rain</span>
+            <span className="text-blue-300 font-mono">{selected.precipProbability}% rain</span>
           )}
         </div>
 
-        {/* Location */}
         {location && (
-          <div className="ml-auto text-xs text-slate-600 flex-shrink-0 hidden sm:block">
+          <div className="ml-auto text-xs text-slate-500 flex-shrink-0 hidden sm:block">
             {Math.abs(location.lat).toFixed(2)}°{location.lat >= 0 ? 'N' : 'S'}, {Math.abs(location.lng).toFixed(2)}°{location.lng >= 0 ? 'E' : 'W'}
           </div>
         )}
       </div>
 
-      {/* Hourly scroll timeline */}
       <div className="overflow-x-auto px-4 pb-2" ref={scrollRef}>
-        <div className="flex gap-0.5" style={{ minWidth: hourly.length * 44 }}>
-          {hourly.map((h, i) => {
+        <div className="flex gap-0.5" style={{ minWidth: timeline.length * 44 }}>
+          {timeline.map((h, i) => {
             const date = new Date(h.time)
             const hour = date.getHours()
             const isSelected = i === selectedIndex
@@ -195,57 +198,75 @@ export default function BottomWeatherBar() {
               date.getMonth() === nowDate.getMonth() &&
               date.getDate() === nowDate.getDate() &&
               date.getHours() === nowDate.getHours()
-            const isPast = date.getTime() < nowDate.getTime() - 30 * 60 * 1000 // >30 min ago
+            const isPast = date.getTime() < nowDate.getTime() - 30 * 60 * 1000
             const hIcon = getWeatherIcon(h.weatherCode, h.isDay)
-
-            // Calculate progress line position within this cell (0-100%)
-            const isPlayingThisHour = playing && Math.floor(selectedForecastHour) === i
-            const progressPct = isPlayingThisHour
-              ? (selectedForecastHour - Math.floor(selectedForecastHour)) * 100
-              : 0
+            const isPlayingThisHour = playing && isSelected
 
             return (
               <button
                 key={h.time}
-                onClick={() => { setSelectedIndex(i); setSelectedForecastHour(i); setPlaying(false) }}
+                onClick={() => {
+                  setSelectedIndex(i)
+                  setSelectedForecastHour(i)
+                  hourRef.current = i
+                  setPlaying(false)
+                }}
                 className={cn(
-                  'relative flex flex-col items-center gap-0 px-1 py-1 rounded min-w-[42px] text-center transition-all overflow-hidden',
-                  isSelected ? 'bg-cyan-500/20 border border-cyan-500/40 scale-105' :
-                  isNowHour ? 'bg-cyan-500/10 border border-cyan-500/20' :
-                  isMidnight ? 'bg-ocean-800/80 hover:bg-ocean-700/60' :
-                  isPast ? 'opacity-60 hover:opacity-80 hover:bg-ocean-800/40' :
-                  'hover:bg-ocean-800/40',
+                  'relative flex flex-col items-center gap-0 px-1 py-1 rounded min-w-[42px] text-center overflow-hidden',
+                  isSelected
+                    ? 'bg-cyan-400 text-ocean-950 border-2 border-white shadow-[0_0_12px_rgba(34,211,238,0.65)] scale-105 z-[1]'
+                    : isNowHour
+                    ? 'bg-red-500/20 border-2 border-red-500 text-slate-100'
+                    : isMidnight
+                    ? 'bg-ocean-800/80 hover:bg-ocean-700/60 border border-transparent'
+                    : isPast
+                    ? 'opacity-70 hover:opacity-100 hover:bg-ocean-800/40 border border-transparent'
+                    : 'hover:bg-ocean-800/40 border border-transparent',
                 )}
               >
-                {/* Progress sweep line during playback */}
                 {isPlayingThisHour && (
                   <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10 transition-none"
-                    style={{ left: `${progressPct}%` }}
+                    ref={progressFillRef}
+                    className="absolute inset-y-0 left-0 bg-white/35 z-0"
+                    style={{ width: '0%' }}
                   />
                 )}
-                {/* Filled progress background */}
                 {isPlayingThisHour && (
                   <div
-                    className="absolute inset-0 bg-cyan-500/10 z-0 transition-none"
-                    style={{ width: `${progressPct}%` }}
+                    ref={playheadLineRef}
+                    className="absolute top-0 bottom-0 z-10 w-[3px] bg-white shadow-[0_0_8px_#fff]"
+                    style={{ left: '0%' }}
                   />
                 )}
-                <span className="text-[9px] text-slate-500">
+                {isNowHour && !isSelected && (
+                  <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-red-500 z-10" />
+                )}
+                <span className={cn(
+                  'relative z-[1] text-[9px] font-semibold',
+                  isSelected ? 'text-ocean-950' : isNowHour ? 'text-red-400' : 'text-slate-400',
+                )}>
                   {isNowHour ? 'Now' : isMidnight
                     ? date.toLocaleDateString('en-US', { weekday: 'short' })
                     : date.toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', '')}
                 </span>
-                <span className="text-xs">{hIcon}</span>
-                <span className="text-[10px] font-semibold text-slate-200 font-mono">{Math.round(h.temperature)}°</span>
-                <div className="flex items-center gap-0.5">
+                <span className="relative z-[1] text-xs">{hIcon}</span>
+                <span className={cn(
+                  'relative z-[1] text-[10px] font-bold font-mono',
+                  isSelected ? 'text-ocean-950' : 'text-slate-100',
+                )}>{Math.round(h.temperature)}°</span>
+                <div className="relative z-[1] flex items-center gap-0.5">
                   <svg width="7" height="7" viewBox="0 0 10 10" style={{ transform: `rotate(${h.windDirection + 180}deg)` }}>
-                    <polygon points="5,0 3,8 5,6 7,8" fill="#94a3b8" />
+                    <polygon points="5,0 3,8 5,6 7,8" fill={isSelected ? '#083344' : '#94a3b8'} />
                   </svg>
-                  <span className="text-[9px] text-slate-400 font-mono">{Math.round(h.windSpeed)}</span>
+                  <span className={cn('text-[9px] font-mono', isSelected ? 'text-ocean-950' : 'text-slate-400')}>
+                    {Math.round(h.windSpeed)}
+                  </span>
                 </div>
                 {h.precipProbability > 0 && (
-                  <span className="text-[10px] text-blue-400 font-mono">{h.precipProbability}%</span>
+                  <span className={cn(
+                    'relative z-[1] text-[10px] font-mono',
+                    isSelected ? 'text-sky-900' : 'text-blue-400',
+                  )}>{h.precipProbability}%</span>
                 )}
               </button>
             )
@@ -253,9 +274,8 @@ export default function BottomWeatherBar() {
         </div>
       </div>
 
-      {/* Wind speed color legend */}
       <div className="hidden sm:flex items-center justify-center gap-0.5 px-4 pb-1.5">
-        <span className="text-[10px] text-slate-600 mr-1">mph</span>
+        <span className="text-[10px] text-slate-500 mr-1">mph</span>
         {[
           { color: '#1e3c8e', label: '0' },
           { color: '#0097a7', label: '5' },

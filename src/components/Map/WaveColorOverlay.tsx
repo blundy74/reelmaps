@@ -4,18 +4,19 @@
  * Renders an ocean-blue gradient on a canvas overlay, using bilinear-interpolated
  * wave height data from Open-Meteo.
  *
- * Coastline clipping uses the Windy.com technique:
+ * Coastline clipping:
  *   1. Draw wave colours across the full viewport (including over land)
- *   2. Set globalCompositeOperation = 'destination-out'
- *   3. Fill Natural Earth land polygons → erases all wave pixels on land
- *   4. Result: pixel-perfect coastline boundary
+ *   2. Soften the field with a small blur
+ *   3. destination-in the basemap's OSM water polygons so the overlay follows
+ *      the same shoreline as the map (Mobile Bay, barrier islands). Falls back
+ *      to inflated Natural Earth 10m land if that layer is missing.
  */
 
 import { useEffect, useRef, useCallback } from 'react'
 import type maplibregl from 'maplibre-gl'
 import { fetchWaveGrid, interpolateWaveHeightAtHour, type WaveGrid } from '../../lib/windField'
-import { getLandData, drawLandMask } from '../../lib/landMask'
-import { useWeatherStore } from '../../store/weatherStore'
+import { clipWavesToCoast } from '../../lib/landMask'
+import { useWeatherStore, selectOverlayHour } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
@@ -76,7 +77,10 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
   const wavesOpacity = useWeatherStore(
     (s) => s.overlays.find((o) => o.id === 'waves')?.opacity ?? 0.6,
   )
-  const forecastHour = useWeatherStore((s) => s.selectedForecastHour)
+  const forecastHour = useWeatherStore(selectOverlayHour)
+  const forecastHourRef = useRef(forecastHour)
+  forecastHourRef.current = forecastHour
+  const coastMaskRef = useRef<HTMLCanvasElement | null>(null)
 
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current
@@ -107,8 +111,6 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
       grid = await fetchWaveGrid(bounds.getSouth(), bounds.getNorth(), bounds.getWest(), bounds.getEast())
     } catch { return }
 
-    const land = await getLandData()
-
     const sw = Math.ceil(cw / SCALE)
     const sh = Math.ceil(ch / SCALE)
 
@@ -130,7 +132,7 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
         const fullPy = y * SCALE + SCALE / 2
         const lngLat = map.unproject([fullPx, fullPy])
 
-        const height = interpolateWaveHeightAtHour(lngLat.lat, lngLat.lng, grid, forecastHour)
+        const height = interpolateWaveHeightAtHour(lngLat.lat, lngLat.lng, grid, forecastHourRef.current)
 
         if (height < 0.01) {
           data[idx + 3] = 0
@@ -154,7 +156,7 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
     ctx.imageSmoothingQuality = 'high'
 
     if (typeof ctx.filter !== 'undefined') {
-      ctx.filter = 'blur(4px)'
+      ctx.filter = 'blur(2px)'
     }
 
     ctx.globalAlpha = wavesOpacity
@@ -162,15 +164,26 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
     ctx.globalAlpha = 1
     ctx.filter = 'none'
 
-    // ── Step 3: Erase land pixels using Natural Earth polygons ───────────
-    // 'destination-out' means: anywhere we draw becomes transparent,
-    // erasing the wave colours beneath. This is how Windy.com clips
-    // ocean data at the coastline.
-    ctx.globalCompositeOperation = 'destination-out'
-    ctx.fillStyle = 'rgba(0,0,0,1)'
-    drawLandMask(ctx, map, land)
-    ctx.globalCompositeOperation = 'source-over'
-  }, [mapRef, wavesOpacity, forecastHour])
+    // ── Step 3: Keep water only. Reuse the coast mask across hour ticks. ──
+    let mask = coastMaskRef.current
+    if (!mask || mask.width !== cw || mask.height !== ch) {
+      mask = document.createElement('canvas')
+      mask.width = cw
+      mask.height = ch
+      const mctx = mask.getContext('2d')
+      if (mctx) {
+        mctx.fillStyle = '#fff'
+        mctx.fillRect(0, 0, cw, ch)
+        await clipWavesToCoast(mctx, map, { inflatePx: 4, featherPx: 2 })
+        coastMaskRef.current = mask
+      }
+    }
+    if (mask) {
+      ctx.globalCompositeOperation = 'destination-in'
+      ctx.drawImage(mask, 0, 0)
+      ctx.globalCompositeOperation = 'source-over'
+    }
+  }, [mapRef, wavesOpacity])
 
   // Mount/unmount: set up map event listeners (does NOT depend on forecastHour)
   useEffect(() => {
@@ -185,22 +198,24 @@ export default function WaveColorOverlay({ mapRef, mapReady }: Props) {
     }
 
     syncSize()
-    getLandData()
     setTimeout(() => renderOverlay(), 100)
 
     const onMoveStart = () => {
       if (renderTimerRef.current) clearTimeout(renderTimerRef.current)
+      coastMaskRef.current = null
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
 
     const onMoveEnd = () => {
       if (renderTimerRef.current) clearTimeout(renderTimerRef.current)
+      coastMaskRef.current = null
       renderTimerRef.current = setTimeout(() => renderOverlay(), 300)
     }
 
     const onResize = () => {
       syncSize()
+      coastMaskRef.current = null
       if (renderTimerRef.current) clearTimeout(renderTimerRef.current)
       renderTimerRef.current = setTimeout(() => renderOverlay(), 300)
     }

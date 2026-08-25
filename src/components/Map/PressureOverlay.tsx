@@ -6,7 +6,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import type maplibregl from 'maplibre-gl'
 import { fetchWindGrid, bilinearInterp, type WindGrid } from '../../lib/windField'
-import { useWeatherStore } from '../../store/weatherStore'
+import { useWeatherStore, selectOverlayHour } from '../../store/weatherStore'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
@@ -151,7 +151,9 @@ export default function PressureOverlay({ mapRef, mapReady }: Props) {
   const pressureOpacity = useWeatherStore(
     (s) => s.overlays.find((o) => o.id === 'pressure')?.opacity ?? 0.6,
   )
-  const forecastHour = useWeatherStore((s) => s.selectedForecastHour)
+  const forecastHour = useWeatherStore(selectOverlayHour)
+  const forecastHourRef = useRef(forecastHour)
+  forecastHourRef.current = forecastHour
 
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current
@@ -182,7 +184,7 @@ export default function PressureOverlay({ mapRef, mapReady }: Props) {
     } catch { return }
 
     // Pick the right hour's pressure data
-    const hourIdx = Math.max(0, Math.min(Math.floor(forecastHour), grid.hours - 1))
+    const hourIdx = Math.max(0, Math.min(Math.floor(forecastHourRef.current), grid.hours - 1))
     const pData = grid.pressureDataByHour[hourIdx] ?? grid.pressureData
 
     // Build a sampled pressure grid at pixel positions
@@ -204,7 +206,7 @@ export default function PressureOverlay({ mapRef, mapReady }: Props) {
 
     ctx.clearRect(0, 0, cw, ch)
     drawIsobars(ctx, pressureGrid, rows, cols, SAMPLE_SCALE, pressureOpacity)
-  }, [mapRef, pressureOpacity, forecastHour])
+  }, [mapRef, pressureOpacity])
 
   useEffect(() => {
     const map = mapRef.current
@@ -249,7 +251,12 @@ export default function PressureOverlay({ mapRef, mapReady }: Props) {
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
     }
-  }, [mapRef, pressureVisible, pressureOpacity, forecastHour, syncSize, renderOverlay, mapReady])
+  }, [mapRef, pressureVisible, pressureOpacity, syncSize, renderOverlay, mapReady])
+
+  useEffect(() => {
+    if (!pressureVisible) return
+    renderOverlay()
+  }, [forecastHour, pressureVisible, renderOverlay])
 
   return (
     <canvas

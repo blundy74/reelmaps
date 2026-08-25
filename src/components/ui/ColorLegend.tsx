@@ -11,10 +11,10 @@ interface LegendDef {
   isWeatherOverlay?: boolean
 }
 
-const LEGENDS: LegendDef[] = [
+export const LEGENDS: LegendDef[] = [
   {
     layerId: 'sst-mur',
-    title: 'Sea Surface Temp',
+    title: 'Cloud-free SST (MUR)',
     unit: '°F / °C',
     gradient: 'linear-gradient(to right, #050080, #0000ff, #00b0ff, #00ffff, #00ff80, #80ff00, #ffff00, #ff8000, #ff0000, #800000)',
     labels: [
@@ -37,7 +37,7 @@ const LEGENDS: LegendDef[] = [
   },
   {
     layerId: 'sst-goes',
-    title: 'GOES SST (NRT)',
+    title: 'VIIRS SST (daily pass)',
     unit: '°F',
     gradient: 'linear-gradient(to right, #050080, #0000ff, #00b0ff, #00ffff, #00ff80, #80ff00, #ffff00, #ff8000, #ff0000)',
     labels: [
@@ -266,7 +266,7 @@ const LEGENDS: LegendDef[] = [
   },
 ]
 
-export function ColorLegend({ forecastBarOpen = false }: { forecastBarOpen?: boolean }) {
+export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forecastBarOpen?: boolean; hidden?: boolean }) {
   const { layers } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
@@ -277,7 +277,7 @@ export function ColorLegend({ forecastBarOpen = false }: { forecastBarOpen?: boo
     return layers.find((l) => l.id === def.layerId)?.visible
   })
 
-  if (!activeLegends.length) return null
+  if (hidden || !activeLegends.length) return null
 
   return (
     <div className={`absolute left-3 md:left-1/2 md:-translate-x-1/2 flex flex-col gap-2 pointer-events-none z-10 transition-all duration-300 ${forecastBarOpen ? 'bottom-[160px]' : 'bottom-10'}`}>
@@ -300,6 +300,49 @@ export function ColorLegend({ forecastBarOpen = false }: { forecastBarOpen?: boo
                 key={label.value}
                 className="absolute text-xs text-slate-400 font-mono whitespace-nowrap -translate-x-1/2"
                 style={{ left: label.position, fontSize: '9px' }}
+              >
+                {label.value}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Compact legend pinned inside the right rail (Windy-class, not a map HUD). */
+export function PinnedLegend() {
+  const { layers } = useMapStore()
+  const weatherOverlays = useWeatherStore((s) => s.overlays)
+
+  const activeLegends = LEGENDS.filter((def) => {
+    if (def.isWeatherOverlay) {
+      return weatherOverlays.find((o) => o.id === def.layerId)?.visible
+    }
+    return layers.find((l) => l.id === def.layerId)?.visible
+  })
+
+  if (!activeLegends.length) return null
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider px-0.5">
+        Legend
+      </p>
+      {activeLegends.slice(0, 3).map((def) => (
+        <div key={def.layerId} className="rounded-lg bg-black/25 border border-white/8 px-2 py-1.5">
+          <div className="flex items-center justify-between mb-1 gap-2">
+            <span className="text-[10px] font-medium text-slate-300 truncate">{def.title}</span>
+            <span className="text-[9px] text-slate-500 font-mono flex-shrink-0">{def.unit}</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full" style={{ background: def.gradient }} />
+          <div className="relative mt-0.5 h-3">
+            {def.labels.filter((_, i) => i === 0 || i === def.labels.length - 1 || i === Math.floor(def.labels.length / 2)).map((label) => (
+              <span
+                key={label.value}
+                className="absolute text-[8px] text-slate-500 font-mono whitespace-nowrap -translate-x-1/2"
+                style={{ left: label.position }}
               >
                 {label.value}
               </span>
