@@ -33,9 +33,9 @@ function hourKey(iso: string) {
 function fmtHour(iso: string) {
   const d = new Date(iso)
   const h = d.getHours()
-  if (h === 0) return '12AM'
-  if (h === 12) return '12PM'
-  return h < 12 ? `${h}AM` : `${h - 12}PM`
+  if (h === 0) return '12a'
+  if (h === 12) return '12p'
+  return h < 12 ? `${h}a` : `${h - 12}p`
 }
 
 function fmtDay(iso: string) {
@@ -360,10 +360,13 @@ export default function WeatherRows() {
           {/* Now-tick dashed line (Savvy/Windy time-strip, same rail) */}
           {tickLeft != null && (
             <div
-              className="pointer-events-none absolute top-4 bottom-0 z-20"
-              style={{ left: tickLeft }}
+              className="pointer-events-none absolute top-3 bottom-0 z-20"
+              style={{ left: tickLeft, width: 0 }}
             >
-              <div className="w-px h-full border-l border-dashed border-orange-400/90" />
+              <div
+                className="h-full"
+                style={{ borderLeft: '2px dashed #fb923c', marginLeft: -1 }}
+              />
             </div>
           )}
         </div>

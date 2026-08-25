@@ -197,10 +197,11 @@ export default function WeatherSidebar({ open, onClose }: Props) {
   const layerById = (id: string) => layers.find((l) => l.id === id)
 
   const handleImagery = (id: string) => {
-    if (!isPremium) {
+    if (!user) {
       setShowAuthModal(true)
       return
     }
+    if (!isPremium) return
     toggleLayer(id)
   }
 
@@ -239,7 +240,7 @@ export default function WeatherSidebar({ open, onClose }: Props) {
 
         <div className="flex-1 overflow-y-auto px-2.5 py-2.5 space-y-3">
           <section>
-            <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-0.5">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 px-0.5">
               Imagery
             </p>
             <div className="grid grid-cols-2 gap-1.5">
@@ -261,7 +262,7 @@ export default function WeatherSidebar({ open, onClose }: Props) {
           </section>
 
           <section>
-            <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-0.5">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 px-0.5">
               Overlays
             </p>
             <div className="grid grid-cols-2 gap-1.5">
@@ -286,7 +287,7 @@ export default function WeatherSidebar({ open, onClose }: Props) {
           <CaptainsBrief />
 
           <section>
-            <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-0.5">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 px-0.5">
               Forecast
             </p>
             <WeatherRows />
