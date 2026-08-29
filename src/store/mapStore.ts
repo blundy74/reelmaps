@@ -220,8 +220,8 @@ export const useMapStore = create<MapState>()(
     }),
     {
       name: 'reelmaps-map-state',
-      version: 12,
-      migrate: (persisted) => {
+      version: 13,
+      migrate: (persisted, version) => {
         const state = persisted as {
           layers?: MapLayer[]
           basemap?: MapState['basemap']
@@ -230,6 +230,11 @@ export const useMapStore = create<MapState>()(
           viewState?: MapState['viewState']
           droppedPin?: MapState['droppedPin']
           sstRange?: SstRange
+        }
+        let sstRange = state.sstRange ?? DEFAULT_SST_RANGE
+        // v12 defaulted to GOM 78–86, which clips late-summer 88s. Product default is Fit.
+        if (version < 13 && sstRange.preset === 'gom') {
+          sstRange = DEFAULT_SST_RANGE
         }
         return {
           layers: mergeLayersFromRegistry(state.layers),
@@ -244,7 +249,7 @@ export const useMapStore = create<MapState>()(
             pitch: 0,
           },
           droppedPin: state.droppedPin ?? null,
-          sstRange: state.sstRange ?? DEFAULT_SST_RANGE,
+          sstRange,
         }
       },
       onRehydrateStorage: () => (state) => {

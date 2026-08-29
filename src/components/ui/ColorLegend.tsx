@@ -19,9 +19,9 @@ export const LEGENDS: LegendDef[] = [
     unit: '°F',
     gradient: SST_GRADIENT_CSS,
     labels: [
-      { value: '78°F', position: '0%' },
-      { value: '82°F', position: '50%' },
-      { value: '86°F', position: '100%' },
+      { value: '50°F', position: '0%' },
+      { value: '70°F', position: '50%' },
+      { value: '90°F', position: '100%' },
     ],
   },
   {
@@ -41,9 +41,9 @@ export const LEGENDS: LegendDef[] = [
     unit: '°F',
     gradient: SST_GRADIENT_CSS,
     labels: [
-      { value: '78°F', position: '0%' },
-      { value: '82°F', position: '50%' },
-      { value: '86°F', position: '100%' },
+      { value: '50°F', position: '0%' },
+      { value: '70°F', position: '50%' },
+      { value: '90°F', position: '100%' },
     ],
   },
   {

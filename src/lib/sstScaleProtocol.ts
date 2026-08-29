@@ -1,9 +1,9 @@
 /**
  * MapLibre protocol: fetch a NASA GIBS SST PNG and rematch its official
- * colormap onto a captain-chosen °F domain (default GOM 78–86).
+ * colormap onto a captain-chosen °F domain (default: Fit-to-view).
  *
  * Usage: prefix the GIBS https URL with `sstscale://minF,maxF/`
- *   e.g. sstscale://78,86/gibs.earthdata.nasa.gov/wms/...
+ *   e.g. sstscale://86.5,89/gibs.earthdata.nasa.gov/wms/...
  */
 
 import maplibregl from 'maplibre-gl'

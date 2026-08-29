@@ -4,7 +4,9 @@
  * NASA GIBS serves pre-colored PNG tiles on a global 0–32°C (~32–90°F) rainbow.
  * In the Gulf that collapses an 8°F fishing window into a washed-out smear.
  * We invert the official GIBS colormap back to °C, then re-apply the same
- * rainbow across a captain-chosen domain (default GOM 78–86°F).
+ * rainbow across a captain-chosen domain. Default is Fit-to-view (p5–p95 of
+ * water currently on screen) so late-summer 88s are not clipped. 78–86°F is
+ * a Loop / sail lock, not the year-round default.
  *
  * Same idea as contour:// for SSH — no new satellite product, no Lambda.
  */
@@ -25,10 +27,21 @@ export interface SstRange {
   maxF: number
 }
 
+/** Placeholder until the first viewport sample returns. Wide so we do not clip 88s. */
 export const DEFAULT_SST_RANGE: SstRange = {
-  preset: 'gom',
-  minF: SST_GOM_MIN_F,
-  maxF: SST_GOM_MAX_F,
+  preset: 'fit',
+  minF: SST_WIDE_MIN_F,
+  maxF: SST_WIDE_MAX_F,
+}
+
+export const SST_LAYER_IDS = ['sst-mur', 'sst-goes'] as const
+
+export function activeSstLayerId(
+  layers: { id: string; visible: boolean }[],
+): (typeof SST_LAYER_IDS)[number] | null {
+  if (layers.some((l) => l.id === 'sst-goes' && l.visible)) return 'sst-goes'
+  if (layers.some((l) => l.id === 'sst-mur' && l.visible)) return 'sst-mur'
+  return null
 }
 
 /** Same rainbow the map HUD already documented — now actually used for coloring. */
