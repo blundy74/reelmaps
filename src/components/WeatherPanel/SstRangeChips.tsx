@@ -115,7 +115,8 @@ export default function SstRangeChips() {
         </Chip>
       </div>
       <p className="text-[9px] text-slate-600 mt-1 px-0.5 leading-snug">
-        Stretches the GIBS rainbow so Gulf rips read. Same VIIRS / MUR tiles — not a new product.
+        Stretches the satellite rainbow so Gulf rips read. Same VIIRS / MUR tiles — not a new product.
+        If the water is all one color, hit Fit.
       </p>
       {fitError && (
         <p className="text-[9px] text-amber-400/90 mt-1 px-0.5">{fitError}</p>
