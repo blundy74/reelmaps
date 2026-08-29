@@ -29,6 +29,7 @@ import type { SavedSpot } from '../../lib/apiClient'
 import { registerSmoothProtocol } from '../../lib/smoothTileProtocol'
 import { registerContourProtocol } from '../../lib/contourTileProtocol'
 import { registerSstScaleProtocol } from '../../lib/sstScaleProtocol'
+import { useSstAutoFit } from '../../hooks/useSstAutoFit'
 import CurrentArrowOverlay from './CurrentArrowOverlay'
 import { SPOT_ICONS, renderIconToImageData, getSpotIcon } from '../../lib/spotIcons'
 
@@ -115,6 +116,8 @@ export default function FishingMap() {
     setFlyToTarget,
     sstRange,
   } = useMapStore()
+
+  useSstAutoFit()
 
   // ── Helper: get current layer object by id ───────────────────────────────
   const getLayer = useCallback(

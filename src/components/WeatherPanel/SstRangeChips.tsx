@@ -2,14 +2,14 @@
  * SST color-range chips for the right rail.
  * Fit-to-view (p5–p95 of water on screen) is the default so late-summer
  * 88s are not clipped. Loop / sail locks 78–86 when the Gulf is in that band.
- * Wide is the global 50–90 rainbow. Auto-fit on first show / date / imagery
- * switch — not on every pan.
+ * Wide is the global 50–90 rainbow. Auto-fit lives in useSstAutoFit (map).
  */
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useMapStore } from '../../store/mapStore'
 import { cn } from '../../lib/utils'
 import {
+  DEFAULT_SST_RANGE,
   SST_GOM_MAX_F,
   SST_GOM_MIN_F,
   SST_WIDE_MAX_F,
@@ -57,66 +57,30 @@ export default function SstRangeChips() {
   const [fitError, setFitError] = useState<string | null>(null)
 
   const layerId = activeSstLayerId(layers)
-  const boundsReady = mapBounds != null
-  const boundsRef = useRef(mapBounds)
-  boundsRef.current = mapBounds
-  const sstRangeRef = useRef(sstRange)
-  sstRangeRef.current = sstRange
+  if (!layerId) return null
 
-  const runFit = async (signal?: AbortSignal, force = false) => {
-    const bounds = boundsRef.current
-    const id = activeSstLayerId(useMapStore.getState().layers)
-    const date = useMapStore.getState().selectedDate
-    if (!bounds || !id) return
-
-    setFitting(true)
+  const handleFitChip = async () => {
     setFitError(null)
+    // Do not copy Loop/sail 78–86 onto the Fit chip — that looks like a no-op.
+    if (sstRange.preset !== 'fit') {
+      setSstRange(DEFAULT_SST_RANGE)
+      return
+    }
+    if (!mapBounds) return
+    setFitting(true)
     try {
-      const span = await sampleSstRangeFromView(id, date, bounds, signal)
-      if (signal?.aborted) return
+      const span = await sampleSstRangeFromView(layerId, selectedDate, mapBounds)
       if (!span) {
         setFitError('No SST water in view — try a clearer date or zoom to ocean.')
         return
       }
-      const cur = sstRangeRef.current
-      if (
-        !force
-        && cur.preset === 'fit'
-        && cur.minF === span.minF
-        && cur.maxF === span.maxF
-      ) {
-        return
-      }
       setSstRange({ preset: 'fit', minF: span.minF, maxF: span.maxF })
     } catch {
-      if (signal?.aborted) return
       setFitError('Could not sample the tiles in view.')
     } finally {
-      if (!signal?.aborted) setFitting(false)
+      setFitting(false)
     }
   }
-
-  // Auto-fit when Fit is the active preset: first show, date change, imagery switch.
-  // boundsReady (not the bounds object) so pans do not re-sample.
-  useEffect(() => {
-    if (sstRange.preset !== 'fit') return
-    if (!layerId || !boundsReady) return
-    const controller = new AbortController()
-    void runFit(controller.signal)
-    return () => controller.abort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sstRange.preset, selectedDate, layerId, boundsReady])
-
-  const handleFitChip = () => {
-    if (sstRange.preset !== 'fit') {
-      setFitError(null)
-      setSstRange({ ...sstRange, preset: 'fit' })
-      return
-    }
-    void runFit(undefined, true)
-  }
-
-  if (!layerId) return null
 
   const fitIsPlaceholder =
     sstRange.minF === SST_WIDE_MIN_F && sstRange.maxF === SST_WIDE_MAX_F
@@ -133,7 +97,11 @@ export default function SstRangeChips() {
         SST color range
       </p>
       <div className="flex flex-wrap gap-1">
-        <Chip active={sstRange.preset === 'fit'} disabled={fitting || !boundsReady} onClick={handleFitChip}>
+        <Chip
+          active={sstRange.preset === 'fit'}
+          disabled={fitting || !mapBounds}
+          onClick={() => { void handleFitChip() }}
+        >
           {fitLabel}
         </Chip>
         <Chip
