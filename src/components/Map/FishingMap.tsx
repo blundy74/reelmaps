@@ -31,6 +31,7 @@ import { registerContourProtocol } from '../../lib/contourTileProtocol'
 import { registerSstScaleProtocol } from '../../lib/sstScaleProtocol'
 import { useSstAutoFit } from '../../hooks/useSstAutoFit'
 import CurrentArrowOverlay from './CurrentArrowOverlay'
+import CurrentSpeedScale from './CurrentSpeedScale'
 import { SPOT_ICONS, renderIconToImageData, getSpotIcon } from '../../lib/spotIcons'
 
 // ── Layer z-order (lower = rendered first / underneath) ─────────────────────
@@ -115,6 +116,7 @@ export default function FishingMap() {
     flyToTarget,
     setFlyToTarget,
     sstRange,
+    setLayerLoading,
   } = useMapStore()
 
   useSstAutoFit()
@@ -125,31 +127,33 @@ export default function FishingMap() {
     [layers],
   )
 
-  // Layers that use 512px tiles for higher visual quality
-  const HI_RES_TILES = new Set(['ssh-anomaly', 'altimetry', 'currents'])
+  // Oceanography rasters are coarse fields — overzoom past these instead of
+  // fetching a 512 WMS tile per map tile at every zoom.
+  const OCEAN_RASTER_MAXZOOM: Record<string, number> = {
+    currents: 6,
+    'ssh-anomaly': 5,
+    altimetry: 6,
+  }
 
   // Low-resolution oceanographic layers that benefit from bilinear smoothing
   const SMOOTH_LAYERS = new Set(['ssh-anomaly', 'currents', 'salinity'])
-
-  // Source zoom overrides for specific layers
-  const SOURCE_ZOOM_OVERRIDES: Record<string, { minzoom?: number; maxzoom?: number }> = {}
 
   // ── Add a raster source + layer to the map ───────────────────────────────
   const addRasterLayer = useCallback(
     (map: maplibregl.Map, layerId: string, tiles: string[], opacity: number) => {
       const sourceId = `${layerId}-source`
-      const tileSize = HI_RES_TILES.has(layerId) ? 512 : 256
+      const tileSize = 256
 
       if (!map.getSource(sourceId)) {
-        const zoomOverride = SOURCE_ZOOM_OVERRIDES[layerId]
-        const maxzoom = zoomOverride?.maxzoom ?? (WMS_LAYERS.has(layerId) ? undefined : 18)
+        const oceanMax = OCEAN_RASTER_MAXZOOM[layerId]
+        const maxzoom = oceanMax ?? (WMS_LAYERS.has(layerId) ? undefined : 18)
         map.addSource(sourceId, {
           type: 'raster',
           tiles,
           tileSize,
           ...(maxzoom ? { maxzoom } : {}),
-          ...(zoomOverride?.minzoom ? { minzoom: zoomOverride.minzoom } : {}),
         })
+        if (oceanMax) setLayerLoading(layerId, true)
       }
 
       if (!map.getLayer(layerId)) {
@@ -166,7 +170,7 @@ export default function FishingMap() {
         })
       }
     },
-    [],
+    [setLayerLoading],
   )
 
   // ── Create oil rig icon for the map ─────────────────────────────────────
@@ -875,9 +879,24 @@ export default function FishingMap() {
 
     mapRef.current = map
 
+    const OCEAN_SOURCES = new Set(['altimetry-source', 'currents-source', 'ssh-anomaly-source'])
+    const onSourceData = (e: maplibregl.MapSourceDataEvent) => {
+      if (!e.sourceId || !OCEAN_SOURCES.has(e.sourceId)) return
+      const id = e.sourceId.replace(/-source$/, '')
+      if (e.isSourceLoaded) setLayerLoading(id, false)
+    }
+    const onDataLoading = (e: { dataType?: string; sourceId?: string }) => {
+      if (e.dataType !== 'source' || !e.sourceId || !OCEAN_SOURCES.has(e.sourceId)) return
+      setLayerLoading(e.sourceId.replace(/-source$/, ''), true)
+    }
+    map.on('sourcedata', onSourceData)
+    map.on('dataloading', onDataLoading)
+
     return () => {
       if (popupRef.current) popupRef.current.remove()
       if (pinMarkerRef.current) pinMarkerRef.current.remove()
+      map.off('sourcedata', onSourceData)
+      map.off('dataloading', onDataLoading)
       map.remove()
       mapRef.current = null
       initializedRef.current = false
@@ -1168,6 +1187,7 @@ export default function FishingMap() {
         visible={getLayer('current-arrows')?.visible ?? false}
         opacity={getLayer('current-arrows')?.opacity ?? 0.85}
       />
+      <CurrentSpeedScale visible={getLayer('current-arrows')?.visible ?? false} />
       <MeasureTool mapRef={mapRef} />
       <LassoTool mapRef={mapRef} />
       {speciesPoint && (

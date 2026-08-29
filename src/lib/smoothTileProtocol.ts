@@ -1,18 +1,16 @@
 /**
- * Custom MapLibre protocol that fetches a raster tile, draws it to an
- * offscreen canvas with a Gaussian blur, and returns the smoothed image.
+ * Custom MapLibre protocol: fetch a raster tile, apply a light blur,
+ * return PNG bytes. Used by the Advanced oceanography rasters
+ * (currents, ssh-anomaly) — those stay off until toggled.
  *
- * Usage:
- *   1. Call `registerSmoothProtocol()` once before creating the map.
- *   2. Prefix tile URLs with `smooth://` instead of `https://`.
- *      e.g. `smooth://nowcoast.noaa.gov/geoserver/...`
- *
- * The blur radius is tunable via the `BLUR_PX` constant.
+ * Processed tiles are LRU-cached so a second pan does not re-decode.
  */
 
 import maplibregl from 'maplibre-gl'
+import { OceanTileCache } from './oceanTileCache'
 
-const BLUR_PX = 4
+const BLUR_PX = 2
+const cache = new OceanTileCache(64)
 
 let registered = false
 
@@ -21,35 +19,33 @@ export function registerSmoothProtocol(): void {
   registered = true
 
   maplibregl.addProtocol('smooth', async (params, abortController) => {
-    // Strip the protocol prefix to get the real HTTPS URL
+    const cached = cache.get(params.url)
+    if (cached) return { data: cached }
+
     const url = params.url.replace('smooth://', 'https://')
-
     const res = await fetch(url, { signal: abortController.signal })
+    if (!res.ok) throw new Error(`smooth tile ${res.status}`)
     const blob = await res.blob()
-    const img = await createImageBitmap(blob)
+    if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError')
 
-    // Draw the tile to a canvas with a blur filter
+    const img = await createImageBitmap(blob)
     const canvas = document.createElement('canvas')
     canvas.width = img.width
     canvas.height = img.height
     const ctx = canvas.getContext('2d')!
-
-    // Draw once normally as the base
     ctx.drawImage(img, 0, 0)
-
-    // Then composite a blurred copy on top for smoothing
     ctx.filter = `blur(${BLUR_PX}px)`
-    ctx.globalAlpha = 0.7
+    ctx.globalAlpha = 0.55
     ctx.drawImage(img, 0, 0)
     ctx.filter = 'none'
-    ctx.globalAlpha = 1.0
+    ctx.globalAlpha = 1
+    img.close()
 
-    // Convert back to PNG ArrayBuffer for MapLibre
-    const resultBlob = await new Promise<Blob>((resolve) =>
-      canvas.toBlob((b) => resolve(b!), 'image/png'),
+    const resultBlob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('smooth toBlob failed'))), 'image/png'),
     )
-    const data = await resultBlob.arrayBuffer()
-
-    return { data: new Uint8Array(data) }
+    const data = new Uint8Array(await resultBlob.arrayBuffer())
+    cache.set(params.url, data)
+    return { data }
   })
 }

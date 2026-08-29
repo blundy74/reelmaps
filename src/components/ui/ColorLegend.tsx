@@ -71,8 +71,30 @@ export const LEGENDS: LegendDef[] = [
     ],
   },
   {
+    layerId: 'current-arrows',
+    title: 'Current speed',
+    unit: 'kt',
+    gradient: 'linear-gradient(to right, #7dd3fc, #eab308, #f97316, #ef4444)',
+    labels: [
+      { value: '0', position: '0%' },
+      { value: '2', position: '50%' },
+      { value: '4 kt', position: '100%' },
+    ],
+  },
+  {
+    layerId: 'altimetry',
+    title: 'SSH contours',
+    unit: '0 fat',
+    gradient: 'linear-gradient(to right, #2563eb, #e2e8f0 50%, #dc2626)',
+    labels: [
+      { value: '−20 cm', position: '0%' },
+      { value: '0', position: '50%' },
+      { value: '+20 cm', position: '100%' },
+    ],
+  },
+  {
     layerId: 'currents',
-    title: 'Ocean Currents',
+    title: 'Ocean Currents (raster)',
     unit: 'm/s (zonal)',
     gradient: 'linear-gradient(to right, #0000cd, #ffffff, #ff0000)',
     labels: [
@@ -83,7 +105,7 @@ export const LEGENDS: LegendDef[] = [
   },
   {
     layerId: 'ssh-anomaly',
-    title: 'Sea Height Anomaly',
+    title: 'SSH Fill',
     unit: 'cm',
     gradient: 'linear-gradient(to right, #0000cd, #ffffff, #ff0000)',
     labels: [
