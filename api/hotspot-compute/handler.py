@@ -9,7 +9,12 @@ Computes a composite fishing hotspot score by detecting edges/gradients in:
 
 Scoring formula (from research):
   BASE = SST_edge*0.35 + Chl_edge*0.25 + Bathy_edge*0.18 + SSH_edge*0.12 + species_bonus*0.10
-  FINAL = BASE * fishability * moon * pressure_trend * time_of_day
+  Inshore FINAL  = BASE * moon * time_of_day
+  Offshore FINAL = BASE   (moon / time-of-day do not rank an offshore waypoint)
+
+Primary SST is a daily ACSPO pass (NOAA-20 / NOAA-21 L3S-LEO). MUR L4 is a
+whole-grid fallback only when that fetch fails entirely. Cloudy ACSPO cells
+stay missing — they are not filled from MUR.
 
 Output: quantized 0-255 grid uploaded to S3, served by the tile Lambda.
 """
@@ -48,6 +53,29 @@ ERDDAP_SERVERS = [
     'https://coastwatch.pfeg.noaa.gov/erddap/griddap',
 ]
 COASTWATCH = ERDDAP_SERVERS[0]
+ERDDAP_HEADERS = {
+    'User-Agent': 'ReelMapsHotspot/1.0 (https://github.com/blundy74/reelmaps)',
+}
+
+# ACSPO daily SST — verified 2026-08-29 against live ERDDAP info + griddap:
+#   coastwatch.pfeg noaacwLEOACSPOSSTL3SnrtCDaily
+#     title: NOAA ACSPO Daily Global 0.02° Super-collated SST (L3S-LEO NRT)
+#     variable: sea_surface_temperature (degree_C)
+#     GHRSST platform attr: MetOp-B, MetOp-C, N20, N21  (S-NPP is not listed)
+#     time: daily at 12:00Z; coverage includes OUT_* Gulf-Atlantic bbox
+#   upwell.pfeg does not host this dataset ID (info 404).
+#   No dedicated NOAA-20 / NOAA-21 L2 or L3C SST IDs exist on upwell or
+#   coastwatch.pfeg (probed n20/n21/j01/j02/noaacwL3Collated* — all 404).
+#   nesdisVHNsstDaily is S-NPP VIIRS — do not use.
+#   sst_front_position exists on the ACSPO dataset but is not fetched here.
+ACSPO_DATASET = 'noaacwLEOACSPOSSTL3SnrtCDaily'
+ACSPO_SST_VAR = 'sea_surface_temperature'
+ACSPO_SERVERS = [
+    'https://coastwatch.pfeg.noaa.gov/erddap/griddap',
+    'https://upwell.pfeg.noaa.gov/erddap/griddap',
+]
+MUR_DATASET = 'jplMURSST41'
+MUR_SST_VAR = 'analysed_sst'
 
 # Species temperature preferences (°F) — optimal range
 SPECIES_TEMPS = {
@@ -69,34 +97,129 @@ SPECIES_TEMPS = {
 }
 
 
-def fetch_sst_grid(target_date=None):
-    """Fetch MUR SST from ERDDAP as a NetCDF grid.
-    Returns SST in °C on the output lat/lon grid, or None on failure.
-    target_date: optional YYYYMMDD to fetch SST for a specific date.
-    """
+def _empty_sst_source():
+    return {
+        'kind': None,
+        'dataset_id': None,
+        'variable': None,
+        'server': None,
+        'time': None,
+        'label': None,
+        'fallback': False,
+    }
+
+
+def _sst_time_constraints(target_date, hour_utc='12'):
+    """Build ERDDAP time constraints, newest first."""
     if target_date:
-        # Parse YYYYMMDD and try that date + a few days back
         base = datetime.strptime(target_date, '%Y%m%d').replace(tzinfo=timezone.utc)
     else:
         base = datetime.now(timezone.utc)
-
+    times = []
+    if not target_date:
+        times.append('last')
     for days_ago in range(0, 4):
-        date = (base - timedelta(days=days_ago)).strftime('%Y-%m-%dT09:00:00Z')
-        url = (
-            f'{COASTWATCH}/jplMURSST41.nc?'
-            f'analysed_sst[({date})]'
-            f'[({OUT_LAT_MIN}):({OUT_LAT_MAX})]'
-            f'[({OUT_LNG_MIN}):({OUT_LNG_MAX})]'
+        times.append(
+            (base - timedelta(days=days_ago)).strftime(f'%Y-%m-%dT{hour_utc}:00:00Z')
         )
-        try:
-            logger.info(f'Fetching SST for {date}...')
-            r = requests.get(url, timeout=120)
-            if r.status_code == 200:
-                return _parse_netcdf(r.content, 'analysed_sst', date)
-            logger.warning(f'SST fetch failed ({r.status_code}) for {date}')
-        except Exception as e:
-            logger.warning(f'SST fetch error for {date}: {e}')
-    return None
+    return times
+
+
+def _fetch_sst_from_erddap(servers, dataset, variable, time_constraints, timeout=180):
+    """Download one SST variable as NetCDF and regrid. No pixel fill.
+    Returns (grid, server, time_used) or (None, None, None).
+    """
+    bbox = (
+        f'[({OUT_LAT_MIN}):({OUT_LAT_MAX})]'
+        f'[({OUT_LNG_MIN}):({OUT_LNG_MAX})]'
+    )
+    for server in servers:
+        for time_str in time_constraints:
+            url = f'{server}/{dataset}.nc?{variable}[({time_str})]{bbox}'
+            try:
+                logger.info(f'Fetching SST {dataset}:{variable} {time_str} from {server}...')
+                r = requests.get(url, timeout=timeout, headers=ERDDAP_HEADERS)
+                if r.status_code != 200:
+                    logger.warning(
+                        f'SST fetch failed ({r.status_code}) {dataset} {time_str} {server}'
+                    )
+                    continue
+                grid = _parse_netcdf(r.content, variable, time_str)
+                if grid is None:
+                    logger.warning(f'SST parse returned None for {dataset} {time_str}')
+                    continue
+                return grid, server, time_str
+            except Exception as e:
+                logger.warning(f'SST fetch error {dataset} {time_str} {server}: {e}')
+    return None, None, None
+
+
+def fetch_sst_grid(target_date=None):
+    """Fetch daily ACSPO SST (N20/N21) from ERDDAP; MUR is whole-grid fallback.
+
+    Primary: noaacwLEOACSPOSSTL3SnrtCDaily sea_surface_temperature (degree_C).
+    Does not request sst_front_position or any S-NPP dataset.
+    Cloudy / missing ACSPO cells stay NaN — never filled from MUR.
+    MUR (jplMURSST41) is used only when the entire ACSPO fetch fails.
+
+    Returns (sst_celsius_grid_or_None, source_meta).
+    """
+    source = _empty_sst_source()
+
+    acspo, server, time_str = _fetch_sst_from_erddap(
+        ACSPO_SERVERS,
+        ACSPO_DATASET,
+        ACSPO_SST_VAR,
+        _sst_time_constraints(target_date, hour_utc='12'),
+    )
+    if acspo is not None:
+        source.update({
+            'kind': 'acspo_n20_n21',
+            'dataset_id': ACSPO_DATASET,
+            'variable': ACSPO_SST_VAR,
+            'server': server,
+            'time': time_str,
+            'label': (
+                'NOAA ACSPO L3S-LEO daily SST '
+                '(platforms N20/N21 + MetOp-B/C; S-NPP not wired)'
+            ),
+            'fallback': False,
+        })
+        logger.info(
+            f'Using ACSPO SST {ACSPO_DATASET} {time_str} '
+            f'({np.count_nonzero(~np.isnan(acspo))} valid pixels; clouds left as NaN)'
+        )
+        return acspo, source
+
+    logger.warning(
+        'ACSPO SST fetch failed entirely — whole-grid MUR L4 fallback (jplMURSST41). '
+        'No per-pixel MUR fill under clouds.'
+    )
+    mur, server, time_str = _fetch_sst_from_erddap(
+        ERDDAP_SERVERS,
+        MUR_DATASET,
+        MUR_SST_VAR,
+        _sst_time_constraints(target_date, hour_utc='09'),
+        timeout=120,
+    )
+    if mur is not None:
+        source.update({
+            'kind': 'mur_l4_fallback',
+            'dataset_id': MUR_DATASET,
+            'variable': MUR_SST_VAR,
+            'server': server,
+            'time': time_str,
+            'label': 'MUR L4 jplMURSST41 (whole-grid fallback; ACSPO unavailable)',
+            'fallback': True,
+        })
+        logger.info(
+            f'Using MUR L4 fallback {MUR_DATASET} {time_str} '
+            f'({np.count_nonzero(~np.isnan(mur))} valid pixels)'
+        )
+        return mur, source
+
+    logger.error('SST fetch failed for both ACSPO and MUR')
+    return None, source
 
 
 def fetch_chlorophyll_grid():
@@ -783,9 +906,9 @@ def handler(event, context):
 
         # ── Fetch all data sources ──────────────────────────────────────
         logger.info('--- Fetching SST ---')
-        sst = fetch_sst_grid(target_date=date_str if target_date else None)
+        sst, sst_source = fetch_sst_grid(target_date=date_str if target_date else None)
         sst_status = f'{np.count_nonzero(~np.isnan(sst))} valid pixels' if sst is not None else 'FAILED'
-        logger.info(f'SST: {sst_status}')
+        logger.info(f'SST: {sst_status} source={sst_source.get("kind")}')
 
         logger.info('--- Fetching Chlorophyll ---')
         chl = fetch_chlorophyll_grid()
@@ -860,12 +983,11 @@ def handler(event, context):
             composite += triple * 0.20  # Big bonus for triple threat
             logger.info(f'Triple threat bonus: max={triple.max():.3f}')
 
-        # ── Apply temporal modifiers ────────────────────────────────────
+        # Moon / time-of-day belong on the inshore/solunar tool, not an
+        # offshore pin. Compute them now; apply only after the split.
         moon = compute_moon_factor()
         tod = compute_time_factor()
-        logger.info(f'Moon factor: {moon:.2f}, Time-of-day factor: {tod:.2f}')
-
-        composite = composite * moon * tod
+        logger.info(f'Moon factor: {moon:.2f}, Time-of-day factor: {tod:.2f} (inshore only)')
 
         # ── Final normalization to 0-1 ──────────────────────────────────
         p99 = np.percentile(composite[composite > 0], 99) if (composite > 0).any() else 1
@@ -887,6 +1009,11 @@ def handler(event, context):
 
             # Inshore: within 9 NM of coastline (but in water)
             inshore_mask = (coast_dist > 0) & (coast_dist <= INSHORE_LIMIT_NM)
+            # Combined layer: moon/tod on inshore pixels only so an offshore
+            # waypoint is not ranked by solunar or time-of-day.
+            composite = np.where(
+                inshore_mask, np.clip(composite * moon * tod, 0, 1), composite
+            ).astype(np.float32)
             inshore = np.where(inshore_mask, composite, 0).astype(np.float32)
 
             # Re-normalize inshore independently — the narrow coastal band has
@@ -925,7 +1052,10 @@ def handler(event, context):
                 _upload_grid(inshore_q, f'grids/hotspot-inshore/{date_str}/daily.bin.gz')
                 _upload_grid(offshore_q, f'grids/hotspot-offshore/{date_str}/daily.bin.gz')
         else:
-            logger.warning('Coastline distance unavailable — uploading combined grid only')
+            logger.warning(
+                'Coastline distance unavailable — uploading combined grid only; '
+                'moon/tod not applied (would rank offshore)'
+            )
 
         # ── Upload combined grid (per-run + latest + daily average) ─────
         key = upload_hotspot_grid(composite, date_str, hour_str, is_backfill=bool(target_date))
@@ -940,8 +1070,16 @@ def handler(event, context):
             'available_dates': available_dates,
             'moon_factor': round(moon, 3),
             'time_factor': round(tod, 3),
+            'moon_tod_applied_to': 'inshore_only',
             'data_sources': {
                 'sst': sst is not None,
+                'sst_source': sst_source.get('kind'),
+                'sst_dataset_id': sst_source.get('dataset_id'),
+                'sst_variable': sst_source.get('variable'),
+                'sst_server': sst_source.get('server'),
+                'sst_time': sst_source.get('time'),
+                'sst_label': sst_source.get('label'),
+                'sst_fallback': bool(sst_source.get('fallback')),
                 'chlorophyll': chl is not None,
                 'bathymetry': bathy is not None,
                 'ssh': ssh is not None,
