@@ -10,6 +10,8 @@
  *  - Esri World Imagery XYZ: https://server.arcgisonline.com
  */
 
+import { applySstScaleUrl } from './sstPalette'
+
 const GIBS_WMS = 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi'
 // CoastWatch ERDDAP removed — only supports EPSG:4326, incompatible with MapLibre tiles
 // AOML ERDDAP removed — only supports EPSG:4326 and proxy only works in Vite dev
@@ -191,8 +193,9 @@ export function sargassumDailyUrl(date: string): string {
 //   VIIRS_SNPP_L2_Sea_Surface_Temp_Day / _Night
 // VIIRS_NOAA20_L2_Sea_Surface_Temp_Day and VIIRS_NOAA21_L2_Sea_Surface_Temp_Day
 // are not published (GetMap returns WMS exception XML). Do NOT point this at
-// GOES-East/GOES-19 ABI, ACSPO fronts, or a range chip. Keep SNPP L2 until
-// NASA GIBS adds N20/N21 VIIRS SST.
+// GOES-East/GOES-19 ABI or ACSPO fronts. Keep SNPP L2 until NASA GIBS adds
+// N20/N21 VIIRS SST. Color-range chips rematch these same SNPP / MUR tiles
+// client-side (sstscale://) — they do not swap the product.
 
 /** VIIRS S-NPP L2 daytime SST — ~1 km daily pass (clouds punch holes). */
 export function sstGoesUrl(date: string): string {
@@ -571,4 +574,17 @@ export function buildTileUrl(layerId: string, date: string): string[] {
     default:
       return []
   }
+}
+
+const SST_SCALE_LAYERS = new Set(['sst-mur', 'sst-goes'])
+
+/** Tile URLs with the SST palette domain encoded for sstscale:// rematch. */
+export function tilesForLayer(
+  layerId: string,
+  date: string,
+  sstRange?: { minF: number; maxF: number },
+): string[] {
+  const urls = buildTileUrl(layerId, date)
+  if (!sstRange || !SST_SCALE_LAYERS.has(layerId)) return urls
+  return urls.map((u) => applySstScaleUrl(u, sstRange.minF, sstRange.maxF))
 }

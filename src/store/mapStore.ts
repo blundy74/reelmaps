@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { MapLayer, BasemapId, FishingSpot, ClickedPoint } from '../types'
 import { LAYER_REGISTRY } from '../lib/layerUrls'
 import { getDefaultDate, toISODate } from '../lib/utils'
+import { DEFAULT_SST_RANGE, type SstRange } from '../lib/sstPalette'
 
 // ---------------------------------------------------------------------------
 // Build initial layer state from registry
@@ -128,6 +129,12 @@ interface MapState {
   // Fly-to target (set to trigger map.flyTo, consumed by FishingMap)
   flyToTarget: { lat: number; lng: number; zoom?: number } | null
 
+  // Visible map bounds (lng/lat) — used by SST fit-to-view
+  mapBounds: { west: number; south: number; east: number; north: number } | null
+
+  // SST palette domain (GIBS tiles rematched client-side)
+  sstRange: SstRange
+
   // Actions
   setViewState: (vs: Partial<MapState['viewState']>) => void
   toggleLayer: (id: string) => void
@@ -144,6 +151,8 @@ interface MapState {
   setMeasureMode: (active: boolean) => void
   setLassoMode: (active: boolean) => void
   setFlyToTarget: (target: { lat: number; lng: number; zoom?: number } | null) => void
+  setMapBounds: (bounds: MapState['mapBounds']) => void
+  setSstRange: (range: SstRange) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -174,6 +183,8 @@ export const useMapStore = create<MapState>()(
       measureMode: false,
       lassoMode: false,
       flyToTarget: null,
+      mapBounds: null,
+      sstRange: DEFAULT_SST_RANGE,
 
       setViewState: (vs) =>
         set((state) => ({ viewState: { ...state.viewState, ...vs } })),
@@ -204,10 +215,12 @@ export const useMapStore = create<MapState>()(
       setMeasureMode: (active) => set({ measureMode: active }),
       setLassoMode: (active) => set({ lassoMode: active }),
       setFlyToTarget: (target) => set({ flyToTarget: target }),
+      setMapBounds: (bounds) => set({ mapBounds: bounds }),
+      setSstRange: (range) => set({ sstRange: range }),
     }),
     {
       name: 'reelmaps-map-state',
-      version: 11,
+      version: 12,
       migrate: (persisted) => {
         const state = persisted as {
           layers?: MapLayer[]
@@ -216,6 +229,7 @@ export const useMapStore = create<MapState>()(
           sidebarOpen?: boolean
           viewState?: MapState['viewState']
           droppedPin?: MapState['droppedPin']
+          sstRange?: SstRange
         }
         return {
           layers: mergeLayersFromRegistry(state.layers),
@@ -230,10 +244,14 @@ export const useMapStore = create<MapState>()(
             pitch: 0,
           },
           droppedPin: state.droppedPin ?? null,
+          sstRange: state.sstRange ?? DEFAULT_SST_RANGE,
         }
       },
       onRehydrateStorage: () => (state) => {
-        if (state) state.layers = mergeLayersFromRegistry(state.layers)
+        if (state) {
+          state.layers = mergeLayersFromRegistry(state.layers)
+          if (!state.sstRange) state.sstRange = DEFAULT_SST_RANGE
+        }
       },
       partialize: (state) => ({
         layers: state.layers,
@@ -242,6 +260,7 @@ export const useMapStore = create<MapState>()(
         sidebarOpen: state.sidebarOpen,
         viewState: state.viewState,
         droppedPin: state.droppedPin,
+        sstRange: state.sstRange,
       }),
     },
   ),

@@ -12,7 +12,7 @@ const SHORTCUTS: { key: string; description: string }[] = [
   { key: 'W', description: 'Toggle wind overlay' },
   { key: 'R', description: 'Toggle rain radar overlay' },
   { key: 'V', description: 'Toggle wave overlay' },
-  { key: 'T', description: 'Toggle SST layer' },
+  { key: 'T', description: 'Toggle SST Analysis (MUR)' },
   { key: 'C', description: 'Toggle currents layer' },
   { key: 'B', description: 'Toggle bathymetry' },
   { key: 'F', description: 'Toggle fishing spots' },

@@ -3,7 +3,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapStore } from '../../store/mapStore'
 import { useWeatherStore } from '../../store/weatherStore'
-import { buildTileUrl, basemapStyleUrl } from '../../lib/layerUrls'
+import { tilesForLayer, basemapStyleUrl } from '../../lib/layerUrls'
 // Radar is now handled by RadarOverlay component
 import { FISHING_SPOTS, spotsToGeoJSON, SPOT_TYPE_COLORS } from '../../lib/fishingSpots'
 import { formatCoords } from '../../lib/utils'
@@ -28,6 +28,7 @@ import { useUserSpotsStore, userSpotsToGeoJSON } from '../../store/userSpotsStor
 import type { SavedSpot } from '../../lib/apiClient'
 import { registerSmoothProtocol } from '../../lib/smoothTileProtocol'
 import { registerContourProtocol } from '../../lib/contourTileProtocol'
+import { registerSstScaleProtocol } from '../../lib/sstScaleProtocol'
 import CurrentArrowOverlay from './CurrentArrowOverlay'
 import { SPOT_ICONS, renderIconToImageData, getSpotIcon } from '../../lib/spotIcons'
 
@@ -112,6 +113,7 @@ export default function FishingMap() {
     setDroppedPin,
     flyToTarget,
     setFlyToTarget,
+    sstRange,
   } = useMapStore()
 
   // ── Helper: get current layer object by id ───────────────────────────────
@@ -505,7 +507,7 @@ export default function FishingMap() {
           )
         } else if (layerId === 'chlorophyll-7day') {
           // Special handling: 7-day composite = 7 sub-layers blended together
-          const dayUrls = buildTileUrl(layerId, selectedDate)
+          const dayUrls = tilesForLayer(layerId, selectedDate)
           const perDayOpacity = layerState.opacity / Math.max(dayUrls.length, 1) * 1.8 // slightly boost since many tiles are transparent (clouds)
 
           for (let d = 0; d < dayUrls.length; d++) {
@@ -527,7 +529,7 @@ export default function FishingMap() {
             }
           }
         } else if (RASTER_LAYERS.has(layerId)) {
-          const tiles = buildTileUrl(layerId, selectedDate)
+          const tiles = tilesForLayer(layerId, selectedDate, sstRange)
           if (!tiles.length) continue
 
           if (!map.getSource(`${layerId}-source`)) {
@@ -554,7 +556,7 @@ export default function FishingMap() {
         if (map.getLayer(id)) map.moveLayer(id)
       }
     },
-    [getLayer, selectedDate, addRasterLayer, addFishingSpotsLayer],
+    [getLayer, selectedDate, sstRange, addRasterLayer, addFishingSpotsLayer],
   )
 
   // ── Drop / move the draggable coordinate pin ────────────────────────────
@@ -641,6 +643,7 @@ export default function FishingMap() {
     // Register smooth:// tile protocol for blurred oceanographic layers
     registerSmoothProtocol()
     registerContourProtocol()
+    registerSstScaleProtocol()
 
     const { viewState, basemap: initialBasemap } = useMapStore.getState()
     const map = new maplibregl.Map({
@@ -809,12 +812,23 @@ export default function FishingMap() {
       }
     }
 
+    const publishBounds = () => {
+      const b = map.getBounds()
+      useMapStore.getState().setMapBounds({
+        west: b.getWest(),
+        south: b.getSouth(),
+        east: b.getEast(),
+        north: b.getNorth(),
+      })
+    }
+
     // ── Sync URL hash on map move ──────────────────────────────────────
     map.on('moveend', () => {
       const center = map.getCenter()
       const z = map.getZoom()
       // Update store so sidebar components can react to map position
       useMapStore.getState().setViewState({ latitude: center.lat, longitude: center.lng, zoom: z })
+      publishBounds()
       const { basemap: currentBasemap, layers: currentLayers } = useMapStore.getState()
       const activeLayers = currentLayers.filter((l) => l.visible).map((l) => l.id)
       syncStateToUrl(
@@ -836,7 +850,7 @@ export default function FishingMap() {
         if (layerId === 'fishing-spots') {
           addFishingSpotsLayer(map, layerState.opacity)
         } else if (layerId === 'chlorophyll-7day') {
-          const dayUrls = buildTileUrl(layerId, latestDate)
+          const dayUrls = tilesForLayer(layerId, latestDate)
           const perDayOpacity = layerState.opacity / Math.max(dayUrls.length, 1) * 1.8
           for (let d = 0; d < dayUrls.length; d++) {
             const subId = `${layerId}-d${d}`
@@ -847,11 +861,12 @@ export default function FishingMap() {
             }
           }
         } else if (RASTER_LAYERS.has(layerId)) {
-          const tiles = buildTileUrl(layerId, latestDate)
+          const tiles = tilesForLayer(layerId, latestDate, useMapStore.getState().sstRange)
           if (tiles.length) addRasterLayer(map, layerId, tiles, layerState.opacity)
         }
       }
       // Signal overlay components that the map is ready
+      publishBounds()
       setMapReady((c) => c + 1)
     })
 

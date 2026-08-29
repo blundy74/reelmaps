@@ -1,5 +1,6 @@
 import { useMapStore } from '../../store/mapStore'
 import { useWeatherStore } from '../../store/weatherStore'
+import { SST_GRADIENT_CSS, sstLegendLabels } from '../../lib/sstPalette'
 
 interface LegendDef {
   layerId: string
@@ -14,14 +15,13 @@ interface LegendDef {
 export const LEGENDS: LegendDef[] = [
   {
     layerId: 'sst-mur',
-    title: 'Cloud-free SST (MUR)',
-    unit: '°F / °C',
-    gradient: 'linear-gradient(to right, #050080, #0000ff, #00b0ff, #00ffff, #00ff80, #80ff00, #ffff00, #ff8000, #ff0000, #800000)',
+    title: 'Cloud-free SST (MUR L4)',
+    unit: '°F',
+    gradient: SST_GRADIENT_CSS,
     labels: [
-      { value: '50°F / 10°C', position: '0%' },
-      { value: '68°F / 20°C', position: '38%' },
-      { value: '82°F / 28°C', position: '75%' },
-      { value: '95°F / 35°C', position: '100%' },
+      { value: '78°F', position: '0%' },
+      { value: '82°F', position: '50%' },
+      { value: '86°F', position: '100%' },
     ],
   },
   {
@@ -37,13 +37,13 @@ export const LEGENDS: LegendDef[] = [
   },
   {
     layerId: 'sst-goes',
-    title: 'VIIRS SST (daily pass)',
+    title: 'VIIRS S-NPP SST (daily pass)',
     unit: '°F',
-    gradient: 'linear-gradient(to right, #050080, #0000ff, #00b0ff, #00ffff, #00ff80, #80ff00, #ffff00, #ff8000, #ff0000)',
+    gradient: SST_GRADIENT_CSS,
     labels: [
-      { value: '50°F', position: '0%' },
-      { value: '70°F', position: '45%' },
-      { value: '90°F', position: '100%' },
+      { value: '78°F', position: '0%' },
+      { value: '82°F', position: '50%' },
+      { value: '86°F', position: '100%' },
     ],
   },
   {
@@ -266,8 +266,13 @@ export const LEGENDS: LegendDef[] = [
   },
 ]
 
+function withSstRange(def: LegendDef, minF: number, maxF: number): LegendDef {
+  if (def.layerId !== 'sst-mur' && def.layerId !== 'sst-goes') return def
+  return { ...def, labels: sstLegendLabels(minF, maxF) }
+}
+
 export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forecastBarOpen?: boolean; hidden?: boolean }) {
-  const { layers } = useMapStore()
+  const { layers, sstRange } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
   const activeLegends = LEGENDS.filter((def) => {
@@ -275,7 +280,7 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
     return layers.find((l) => l.id === def.layerId)?.visible
-  })
+  }).map((def) => withSstRange(def, sstRange.minF, sstRange.maxF))
 
   if (hidden || !activeLegends.length) return null
 
@@ -313,7 +318,7 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
 
 /** Compact legend pinned inside the right rail (Windy-class, not a map HUD). */
 export function PinnedLegend() {
-  const { layers } = useMapStore()
+  const { layers, sstRange } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
   const activeLegends = LEGENDS.filter((def) => {
@@ -321,7 +326,7 @@ export function PinnedLegend() {
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
     return layers.find((l) => l.id === def.layerId)?.visible
-  })
+  }).map((def) => withSstRange(def, sstRange.minF, sstRange.maxF))
 
   if (!activeLegends.length) return null
 

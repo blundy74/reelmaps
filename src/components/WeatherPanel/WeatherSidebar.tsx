@@ -17,9 +17,10 @@ import {
 } from '../../lib/weatherTypes'
 import { PinnedLegend } from '../ui/ColorLegend'
 import WeatherRows from './WeatherRows'
+import SstRangeChips from './SstRangeChips'
 
 const IMAGERY = [
-  { id: 'sst-mur', name: 'SST MUR' },
+  { id: 'sst-mur', name: 'SST Analysis' },
   { id: 'sst-goes', name: 'SST Daily' },
   { id: 'chlorophyll', name: 'Chl-a' },
   { id: 'true-color-viirs', name: 'True Color' },
@@ -207,6 +208,8 @@ export default function WeatherSidebar({ open, onClose }: Props) {
               ))}
             </div>
           </section>
+
+          <SstRangeChips />
 
           <section>
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 px-0.5">

@@ -284,7 +284,7 @@ export default function SpeciesPredictor({ lat, lng, onClose, className }: Speci
       <div className="px-4 py-2.5 border-b border-ocean-700/40 bg-ocean-800/40">
         <div className="flex items-center gap-4 text-xs">
           <div className="flex items-center gap-1.5">
-            <span className="text-cyan-400 font-medium">SST</span>
+            <span className="text-cyan-400 font-medium">Water temp</span>
             {loading ? (
               <span className="text-slate-500">--</span>
             ) : sst != null ? (
@@ -373,7 +373,7 @@ export default function SpeciesPredictor({ lat, lng, onClose, className }: Speci
       {/* Footer */}
       {!loading && results.length > 0 && (
         <div className="px-4 py-2 border-t border-ocean-700/40 text-[10px] text-slate-500 text-center">
-          Based on current SST, depth &amp; region conditions
+          Based on model water temp (Open-Meteo), depth &amp; region — not satellite SST
         </div>
       )}
     </div>

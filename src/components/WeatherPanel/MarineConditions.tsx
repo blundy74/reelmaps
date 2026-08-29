@@ -69,9 +69,9 @@ export default function MarineConditions({ marine }: Props) {
           </div>
         </div>
 
-        {/* SST */}
+        {/* Model water temp — Open-Meteo marine, not satellite SST */}
         <div className="bg-ocean-800/60 rounded-lg p-2.5 border border-ocean-700/50">
-          <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Sea Temp</div>
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Model water temp</div>
           <div className="text-sm font-semibold text-slate-200 font-mono">
             {Math.round(now.seaSurfaceTemp)}°F
           </div>

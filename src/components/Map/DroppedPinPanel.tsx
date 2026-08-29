@@ -51,7 +51,7 @@ function useActiveWeatherContext() {
 
   const windActive = weatherOverlays.find((o) => o.id === 'wind')?.visible ?? false
   const radarActive = weatherOverlays.find((o) => o.id === 'radar')?.visible ?? false
-  const sstActive = mapLayers.find((l) => l.id === 'sst-mur')?.visible ?? false
+  const sstActive = mapLayers.some((l) => (l.id === 'sst-mur' || l.id === 'sst-goes') && l.visible)
   const currentsActive = mapLayers.find((l) => l.id === 'currents')?.visible ?? false
   const chlorophyllActive = mapLayers.find((l) => l.id === 'chlorophyll')?.visible ?? false
   const salinityActive = mapLayers.find((l) => l.id === 'salinity')?.visible ?? false
@@ -289,9 +289,9 @@ export default function DroppedPinPanel() {
                     <div className="text-[10px] text-slate-400">{marineNow.windWavePeriod.toFixed(0)}s {degreesToCardinal(marineNow.windWaveDirection)}</div>
                   </div>
 
-                  {/* SST */}
+                  {/* Model water temp — Open-Meteo marine, not satellite SST */}
                   <div className="bg-ocean-800 rounded-lg px-3 py-2 min-w-[100px]">
-                    <div className="text-[9px] text-slate-500 uppercase mb-0.5">SST</div>
+                    <div className="text-[9px] text-slate-500 uppercase mb-0.5">Model water temp</div>
                     <span className="text-sm font-bold text-cyan-300 font-mono">{Math.round(marineNow.seaSurfaceTemp)}°F</span>
                   </div>
 
@@ -346,7 +346,7 @@ export default function DroppedPinPanel() {
                 {/* SST + Current side by side */}
                 <div className="grid grid-cols-2 gap-1.5">
                   <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
-                    <div className="text-[9px] text-slate-500 uppercase">Sea Surface Temp</div>
+                    <div className="text-[9px] text-slate-500 uppercase">Model water temp</div>
                     <span className="text-xs font-semibold text-cyan-300 font-mono">{Math.round(marineNow.seaSurfaceTemp)}°F</span>
                   </div>
                   <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
