@@ -9,6 +9,7 @@ import type {
 } from '../lib/weatherTypes'
 import { fetchForecast, fetchMarine } from '../lib/weatherApi'
 import type { UnitSystem } from '../lib/units'
+import { useMapStore } from './mapStore'
 
 export interface HomePort {
   name: string
@@ -134,9 +135,10 @@ export const useWeatherStore = create<WeatherState>()(
       fetchWeather: async (lat, lng) => {
         set({ loading: true, error: null, location: { lat, lng } })
         try {
+          const bounds = useMapStore.getState().mapBounds
           const [forecast, marine] = await Promise.allSettled([
             fetchForecast(lat, lng),
-            fetchMarine(lat, lng),
+            fetchMarine(lat, lng, bounds),
           ])
 
           const updates: Partial<WeatherState> = { loading: false }

@@ -12,7 +12,6 @@ import type maplibregl from 'maplibre-gl'
 import {
   fetchWaveGrid,
   interpolateWaveHeightAtHour,
-  invalidateWaveCache,
   type WaveGrid,
 } from '../../lib/windField'
 import { paintLandMask } from '../../lib/landMask'
@@ -182,8 +181,7 @@ export default function WaveArrowOverlay({ mapRef, mapReady }: Props) {
     const map = mapRef.current
     if (!map) return
     const container = map.getContainer()
-    invalidateWaveCache()
-    // Build mask and fetch grid in parallel
+    // Reuse the shared viewport marine fetch — do not bust the bbox/hour cache.
     const [mask] = await Promise.all([
       buildLandMaskBitmap(map, container.clientWidth, container.clientHeight),
       fetchGrid(),
