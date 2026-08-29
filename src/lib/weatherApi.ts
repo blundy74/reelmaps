@@ -10,6 +10,7 @@ import type {
   MarineData,
   MarineHourlyEntry,
 } from './weatherTypes'
+import { fetchWaveGrid, peekWaveGrid, sampleWavePoint, type WaveGrid } from './windField'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -150,47 +151,81 @@ export async function fetchForecast(lat: number, lng: number): Promise<ForecastR
   return result
 }
 
-// ── Open-Meteo Marine API ───────────────────────────────────────────────────
+// ── Marine rows — sampled from the shared viewport wave grid (no extra HTTP) ─
 
-export async function fetchMarine(lat: number, lng: number): Promise<MarineData> {
+export interface MarineBounds {
+  south: number
+  north: number
+  west: number
+  east: number
+}
+
+const marineInflight = new Map<string, Promise<MarineData>>()
+
+export function marineFromWaveGrid(grid: WaveGrid, lat: number, lng: number): MarineData {
+  const hourly: MarineHourlyEntry[] = grid.times.map((time, i) => {
+    const s = sampleWavePoint(grid, lat, lng, i)
+    return {
+      time,
+      waveHeight: M_TO_FT(s.heightM),
+      waveDirection: s.direction,
+      wavePeriod: s.period,
+      windWaveHeight: 0,
+      windWaveDirection: 0,
+      windWavePeriod: 0,
+      swellHeight: 0,
+      swellDirection: 0,
+      swellPeriod: s.swellPeriod,
+      oceanCurrentSpeed: 0,
+      oceanCurrentDirection: 0,
+      seaSurfaceTemp: 0,
+    }
+  })
+  return { hourly }
+}
+
+/**
+ * Point marine for the right rail. Reuses fetchWaveGrid (one marine HTTP
+ * request per viewport + hour) instead of a second Open-Meteo marine call.
+ */
+export async function fetchMarine(
+  lat: number,
+  lng: number,
+  bounds?: MarineBounds | null,
+): Promise<MarineData> {
   const key = cacheKey('marine', lat, lng)
   const cached = getCached<MarineData>(key)
   if (cached) return cached
 
-  const params = [
-    'wave_height', 'wave_direction', 'wave_period',
-    'wind_wave_height', 'wind_wave_direction', 'wind_wave_period',
-    'swell_wave_height', 'swell_wave_direction', 'swell_wave_period',
-    'ocean_current_velocity', 'ocean_current_direction',
-    'sea_surface_temperature',
-  ].join(',')
+  const pending = marineInflight.get(key)
+  if (pending) return pending
 
-  const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lng}`
-    + `&hourly=${params}&forecast_days=3&timezone=auto`
+  const existing = peekWaveGrid()
+  if (existing && existing.lats.length > 1 && existing.lngs.length > 1
+    && lat >= existing.lats[0] && lat <= existing.lats[existing.lats.length - 1]
+    && lng >= existing.lngs[0] && lng <= existing.lngs[existing.lngs.length - 1]) {
+    const result = marineFromWaveGrid(existing, lat, lng)
+    setCache(key, result)
+    return result
+  }
 
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`Open-Meteo marine error: ${res.status}`)
-  const data = await res.json()
+  const south = bounds?.south ?? lat - 1
+  const north = bounds?.north ?? lat + 1
+  const west = bounds?.west ?? lng - 1.5
+  const east = bounds?.east ?? lng + 1.5
 
-  const hourly: MarineHourlyEntry[] = data.hourly.time.slice(0, 72).map((t: string, i: number) => ({
-    time: t,
-    waveHeight: M_TO_FT(data.hourly.wave_height?.[i] ?? 0),
-    waveDirection: data.hourly.wave_direction?.[i] ?? 0,
-    wavePeriod: data.hourly.wave_period?.[i] ?? 0,
-    windWaveHeight: M_TO_FT(data.hourly.wind_wave_height?.[i] ?? 0),
-    windWaveDirection: data.hourly.wind_wave_direction?.[i] ?? 0,
-    windWavePeriod: data.hourly.wind_wave_period?.[i] ?? 0,
-    swellHeight: M_TO_FT(data.hourly.swell_wave_height?.[i] ?? 0),
-    swellDirection: data.hourly.swell_wave_direction?.[i] ?? 0,
-    swellPeriod: data.hourly.swell_wave_period?.[i] ?? 0,
-    oceanCurrentSpeed: KMH_TO_KT(data.hourly.ocean_current_velocity?.[i] ?? 0),
-    oceanCurrentDirection: data.hourly.ocean_current_direction?.[i] ?? 0,
-    seaSurfaceTemp: C_TO_F(data.hourly.sea_surface_temperature?.[i] ?? 0),
-  }))
+  const promise = fetchWaveGrid(south, north, west, east)
+    .then((grid) => {
+      const result = marineFromWaveGrid(grid, lat, lng)
+      setCache(key, result)
+      return result
+    })
+    .finally(() => {
+      marineInflight.delete(key)
+    })
 
-  const result: MarineData = { hourly }
-  setCache(key, result)
-  return result
+  marineInflight.set(key, promise)
+  return promise
 }
 
 // ── RainViewer API (radar tiles) ────────────────────────────────────────────

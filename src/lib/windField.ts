@@ -48,13 +48,32 @@ export function invalidateWindCache(): void {
   cachedGrid = null
 }
 
+/** Shared 429 cooldown so overlapping callers do not stampede the free marine API. */
+let marineBackoffUntil = 0
+
+function parseRetryAfterMs(res: Response, attempt: number): number {
+  const raw = res.headers.get('Retry-After')
+  if (raw) {
+    const sec = Number(raw)
+    if (Number.isFinite(sec) && sec > 0) return Math.min(sec * 1000, 60_000)
+    const when = Date.parse(raw)
+    if (Number.isFinite(when)) return Math.min(Math.max(0, when - Date.now()), 60_000)
+  }
+  return 3000 * Math.pow(3, attempt)
+}
+
 /** Fetch with retry on 429 (rate limit) — waits and retries up to 3 times */
 async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
   for (let attempt = 0; attempt <= retries; attempt++) {
+    const cooldown = marineBackoffUntil - Date.now()
+    if (cooldown > 0) {
+      await new Promise(r => setTimeout(r, cooldown))
+    }
     const res = await fetch(url)
     if (res.status === 429 && attempt < retries) {
-      // Wait with exponential backoff: 3s, 9s, 27s
-      await new Promise(r => setTimeout(r, 3000 * Math.pow(3, attempt)))
+      const wait = parseRetryAfterMs(res, attempt)
+      marineBackoffUntil = Date.now() + wait
+      await new Promise(r => setTimeout(r, wait))
       continue
     }
     if (!res.ok) throw new Error(`Open-Meteo error: ${res.status}`)
@@ -301,25 +320,85 @@ export function interpolateWindAtHour(
 }
 
 // ---------------------------------------------------------------------------
-// Wave grid (separate cache)
+// Wave grid — ONE marine fetch per viewport + hour, shared by color overlay,
+// arrow overlay, and right-rail wave rows. Do not grow this grid.
 // ---------------------------------------------------------------------------
 
 export interface WaveGrid {
   lats: number[]
   lngs: number[]
-  heightDataByHour: number[][][] // [hour][lat][lng]
+  heightDataByHour: number[][][] // [hour][lat][lng] metres
+  directionDataByHour: number[][][]
+  periodDataByHour: number[][][]
+  swellPeriodDataByHour: number[][][]
   heightData: number[][]   // current hour (index 0) for backward compat
   directionData: number[][]
   periodData: number[][]
+  times: string[]
   hours: number
   timestamp: number
+  cacheKey: string
 }
 
-let cachedWaveGrid: WaveGrid | null = null
-let inflightWave: Promise<WaveGrid> | null = null
+/** Same 12×12 overlay sampling as before — share the fetch, do not thin the field. */
+const WAVE_GRID_SIZE = 12
+const WAVE_FORECAST_HOURS = 72
+const WAVE_HOUR_MS = 60 * 60 * 1000
+const WAVE_BOUNDS_QUANTUM = 4 // 0.25°
+const WAVE_COVER_SLACK = 0.05
+
+const waveCache = new Map<string, WaveGrid>()
+let waveInflight: Promise<WaveGrid> | null = null
+
+export function waveViewportKey(
+  south: number, north: number, west: number, east: number,
+  atMs: number = Date.now(),
+): string {
+  const q = (v: number) => (Math.round(v * WAVE_BOUNDS_QUANTUM) / WAVE_BOUNDS_QUANTUM).toFixed(2)
+  const hour = Math.floor(atMs / WAVE_HOUR_MS)
+  return `${q(south)}|${q(north)}|${q(west)}|${q(east)}|${hour}`
+}
+
+function waveHourBucket(atMs: number = Date.now()): number {
+  return Math.floor(atMs / WAVE_HOUR_MS)
+}
+
+export function waveGridCovers(
+  grid: WaveGrid,
+  south: number, north: number, west: number, east: number,
+): boolean {
+  if (grid.lats.length < 2 || grid.lngs.length < 2) return false
+  if (waveHourBucket(grid.timestamp) !== waveHourBucket()) return false
+  return (
+    grid.lats[0] <= south + WAVE_COVER_SLACK &&
+    grid.lats[grid.lats.length - 1] >= north - WAVE_COVER_SLACK &&
+    grid.lngs[0] <= west + WAVE_COVER_SLACK &&
+    grid.lngs[grid.lngs.length - 1] >= east - WAVE_COVER_SLACK
+  )
+}
+
+function findCachedWaveGrid(
+  south: number, north: number, west: number, east: number,
+): WaveGrid | null {
+  const key = waveViewportKey(south, north, west, east)
+  const exact = waveCache.get(key)
+  if (exact) return exact
+  for (const grid of waveCache.values()) {
+    if (waveGridCovers(grid, south, north, west, east)) return grid
+  }
+  return null
+}
 
 export function invalidateWaveCache(): void {
-  cachedWaveGrid = null
+  waveCache.clear()
+}
+
+export function peekWaveGrid(): WaveGrid | null {
+  let newest: WaveGrid | null = null
+  for (const grid of waveCache.values()) {
+    if (!newest || grid.timestamp > newest.timestamp) newest = grid
+  }
+  return newest
 }
 
 export async function fetchWaveGrid(
@@ -328,25 +407,73 @@ export async function fetchWaveGrid(
   west: number,
   east: number,
 ): Promise<WaveGrid> {
-  if (cachedWaveGrid && Date.now() - cachedWaveGrid.timestamp < CACHE_TTL_MS) {
-    return cachedWaveGrid
+  const cached = findCachedWaveGrid(south, north, west, east)
+  if (cached) return cached
+
+  if (waveInflight) {
+    try {
+      const incoming = await waveInflight
+      if (waveGridCovers(incoming, south, north, west, east)) return incoming
+      const after = findCachedWaveGrid(south, north, west, east)
+      if (after) return after
+    } catch {
+      // Fall through and fetch this viewport.
+    }
   }
-  if (inflightWave) return inflightWave
-  inflightWave = _fetchWaveGridImpl(south, north, west, east)
-  try {
-    return await inflightWave
-  } finally {
-    inflightWave = null
-  }
+
+  const promise = _fetchWaveGridImpl(south, north, west, east)
+    .then((grid) => {
+      waveCache.set(grid.cacheKey, grid)
+      return grid
+    })
+    .catch((err) => {
+      const stale = findCachedWaveGrid(south, north, west, east) ?? peekWaveGrid()
+      if (stale) return stale
+      throw err
+    })
+    .finally(() => {
+      if (waveInflight === promise) waveInflight = null
+    })
+
+  waveInflight = promise
+  return promise
 }
 
-const WAVE_GRID_SIZE = 12 // 12x12 = 144 points — balanced resolution vs rate limits
+function emptyLayer(nLat: number, nLng: number): number[][] {
+  return Array.from({ length: nLat }, () => Array<number>(nLng).fill(0))
+}
+
+function layerAtHour(
+  results: Array<{ hourly?: Record<string, Array<number | string> | undefined> }>,
+  field: string,
+  hour: number,
+  nLat: number,
+  nLng: number,
+): number[][] {
+  const layer = emptyLayer(nLat, nLng)
+  for (let li = 0; li < nLat; li++) {
+    for (let gi = 0; gi < nLng; gi++) {
+      const raw = results[li * nLng + gi]?.hourly?.[field]?.[hour]
+      layer[li][gi] = typeof raw === 'number' ? raw : 0
+    }
+  }
+  return layer
+}
 
 async function _fetchWaveGridImpl(
   south: number, north: number, west: number, east: number,
 ): Promise<WaveGrid> {
-  const lats = linspace(south, north, WAVE_GRID_SIZE)
-  const lngs = linspace(west, east, WAVE_GRID_SIZE)
+  const latSpan = Math.max(0.2, north - south)
+  const lngSpan = Math.max(0.2, east - west)
+  const padLat = latSpan * 0.08
+  const padLng = lngSpan * 0.08
+  const s = south - padLat
+  const n = north + padLat
+  const w = west - padLng
+  const e = east + padLng
+
+  const lats = linspace(s, n, WAVE_GRID_SIZE)
+  const lngs = linspace(w, e, WAVE_GRID_SIZE)
 
   const flatLats: number[] = []
   const flatLngs: number[] = []
@@ -357,62 +484,52 @@ async function _fetchWaveGridImpl(
     }
   }
 
-  const FORECAST_HOURS = 24
+  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago'
 
   const url =
     `https://marine-api.open-meteo.com/v1/marine` +
     `?latitude=${flatLats.join(',')}` +
     `&longitude=${flatLngs.join(',')}` +
-    `&hourly=wave_height,wave_direction,wave_period` +
-    `&forecast_hours=${FORECAST_HOURS}`
+    `&hourly=wave_height,wave_direction,wave_period,swell_wave_period` +
+    `&forecast_hours=${WAVE_FORECAST_HOURS}` +
+    `&timezone=${encodeURIComponent(browserTz)}`
 
   const res = await fetchWithRetry(url)
   const json = await res.json()
-  const results: Array<{
-    hourly: { wave_height: number[]; wave_direction: number[]; wave_period: number[] }
-  }> = Array.isArray(json) ? json : [json]
+  const results: Array<{ hourly?: Record<string, Array<number | string> | undefined> }> =
+    Array.isArray(json) ? json : [json]
 
   const numHours = results[0]?.hourly?.wave_height?.length ?? 1
+  const times = (results[0]?.hourly?.time ?? []).filter((t): t is string => typeof t === 'string').slice(0, numHours)
+  const nLat = lats.length
+  const nLng = lngs.length
 
-  // Build hourly height grids — results[latIdx * lngs.length + lngIdx]
   const heightDataByHour: number[][][] = []
-  for (let h = 0; h < numHours; h++) {
-    const heightHour: number[][] = []
-    for (let li = 0; li < lats.length; li++) {
-      const hRow: number[] = []
-      for (let gi = 0; gi < lngs.length; gi++) {
-        const entry = results[li * lngs.length + gi]
-        hRow.push(entry?.hourly?.wave_height?.[h] ?? 0)
-      }
-      heightHour.push(hRow)
-    }
-    heightDataByHour.push(heightHour)
-  }
+  const directionDataByHour: number[][][] = []
+  const periodDataByHour: number[][][] = []
+  const swellPeriodDataByHour: number[][][] = []
 
-  // Direction and period for current hour (index 0) for the marine panel
-  const directionData: number[][] = []
-  const periodData: number[][] = []
-  for (let li = 0; li < lats.length; li++) {
-    const dRow: number[] = []
-    const pRow: number[] = []
-    for (let gi = 0; gi < lngs.length; gi++) {
-      const entry = results[li * lngs.length + gi]
-      dRow.push(entry?.hourly?.wave_direction?.[0] ?? 0)
-      pRow.push(entry?.hourly?.wave_period?.[0] ?? 0)
-    }
-    directionData.push(dRow)
-    periodData.push(pRow)
+  for (let h = 0; h < numHours; h++) {
+    heightDataByHour.push(layerAtHour(results, 'wave_height', h, nLat, nLng))
+    directionDataByHour.push(layerAtHour(results, 'wave_direction', h, nLat, nLng))
+    periodDataByHour.push(layerAtHour(results, 'wave_period', h, nLat, nLng))
+    swellPeriodDataByHour.push(layerAtHour(results, 'swell_wave_period', h, nLat, nLng))
   }
 
   const grid: WaveGrid = {
     lats, lngs,
     heightDataByHour,
+    directionDataByHour,
+    periodDataByHour,
+    swellPeriodDataByHour,
     heightData: heightDataByHour[0] ?? [],
-    directionData, periodData,
+    directionData: directionDataByHour[0] ?? [],
+    periodData: periodDataByHour[0] ?? [],
+    times,
     hours: numHours,
     timestamp: Date.now(),
+    cacheKey: waveViewportKey(south, north, west, east),
   }
-  cachedWaveGrid = grid
   return grid
 }
 
@@ -484,4 +601,28 @@ export function interpolateWaveHeightAtHour(
   const val1 = bilinearInterp(lat, lng, grid.lats, grid.lngs, grid.heightDataByHour[clampH(h1)])
 
   return val0 + (val1 - val0) * t
+}
+
+function sampleWaveLayerAtHour(
+  lat: number, lng: number, grid: WaveGrid, hour: number, layers: number[][][],
+): number {
+  const h = Math.max(0, Math.min(Math.round(hour), grid.hours - 1))
+  const data = layers[h]
+  if (!data) return 0
+  return bilinearInterp(lat, lng, grid.lats, grid.lngs, data)
+}
+
+/** Sample the shared viewport grid at a point for rail / marine rows. */
+export function sampleWavePoint(
+  grid: WaveGrid,
+  lat: number,
+  lng: number,
+  hour: number,
+): { heightM: number; direction: number; period: number; swellPeriod: number } {
+  return {
+    heightM: sampleWaveLayerAtHour(lat, lng, grid, hour, grid.heightDataByHour),
+    direction: sampleWaveLayerAtHour(lat, lng, grid, hour, grid.directionDataByHour),
+    period: sampleWaveLayerAtHour(lat, lng, grid, hour, grid.periodDataByHour),
+    swellPeriod: sampleWaveLayerAtHour(lat, lng, grid, hour, grid.swellPeriodDataByHour),
+  }
 }
