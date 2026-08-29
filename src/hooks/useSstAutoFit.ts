@@ -1,11 +1,16 @@
 /**
  * Auto-fit SST palette to p5–p95 of water in view.
- * Runs when Fit is the preset and SST first shows, the date changes, or
- * imagery switches. Uses boundsReady (not the bounds object) so pans do not
- * re-sample. Manual Fit-after-pan is the chip's job.
  *
- * Waits for persist hydration so a leftover v12 GOM default can migrate to
- * Fit before the first sample — otherwise rehydrate aborts the in-flight fit.
+ * Re-Fit ONLY on:
+ *   1. first SST show (hydrate + SST appears)
+ *   2. MUR ↔ Daily imagery switch
+ *   3. explicit Fit tap (chip — not this hook)
+ *
+ * Date scrub does NOT re-sample. A Fit / Loop / sail / Wide window
+ * survives the next pass, same as Hilton Min/Max and SatFish Previous.
+ * Pans do not re-sample (boundsReady, not the bounds object).
+ *
+ * Locked chips (gom / wide / custom) never auto-fit.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -33,7 +38,6 @@ function usePersistHydrated(): boolean {
 
 export function useSstAutoFit() {
   const preset = useMapStore((s) => s.sstRange.preset)
-  const selectedDate = useMapStore((s) => s.selectedDate)
   const layers = useMapStore((s) => s.layers)
   const mapBounds = useMapStore((s) => s.mapBounds)
   const setSstRange = useMapStore((s) => s.setSstRange)
@@ -51,11 +55,12 @@ export function useSstAutoFit() {
     if (!bounds) return
 
     const controller = new AbortController()
+    const date = useMapStore.getState().selectedDate
     void (async () => {
       try {
         const span = await sampleSstRangeFromView(
           layerId,
-          selectedDate,
+          date,
           bounds,
           controller.signal,
         )
@@ -69,5 +74,6 @@ export function useSstAutoFit() {
       }
     })()
     return () => controller.abort()
-  }, [hydrated, preset, selectedDate, layerId, boundsReady, setSstRange])
+    // selectedDate is intentionally omitted — date scrub keeps the last window.
+  }, [hydrated, preset, layerId, boundsReady, setSstRange])
 }

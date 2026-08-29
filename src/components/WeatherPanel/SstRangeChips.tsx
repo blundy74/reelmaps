@@ -2,7 +2,9 @@
  * SST color-range chips for the right rail.
  * Fit-to-view (p5–p95 of water on screen) is the default so late-summer
  * 88s are not clipped. Loop / sail locks 78–86 when the Gulf is in that band.
- * Wide is the global 50–90 rainbow. Auto-fit lives in useSstAutoFit (map).
+ * Wide is the global 50–90 rainbow. Date scrub keeps the locked window.
+ * Auto-fit on first show / imagery switch lives in useSstAutoFit; this
+ * chip is the explicit re-sample.
  */
 
 import { useState, type ReactNode } from 'react'
@@ -124,8 +126,8 @@ export default function SstRangeChips() {
         </Chip>
       </div>
       <p className="text-[9px] text-slate-600 mt-1 px-0.5 leading-snug">
-        Fit is the default — p5–p95 of water in view, so August 88s are not clipped.
-        Loop / sail locks 78–86 when the Gulf is actually in that band. Wide is the global rainbow.
+        Fit is the default — p5–p95 of water in view. Date scrub keeps this window; tap Fit to re-sample.
+        Loop / sail locks 78–86. Wide is the global rainbow.
       </p>
       {fitError && (
         <p className="text-[9px] text-amber-400/90 mt-1 px-0.5">{fitError}</p>
