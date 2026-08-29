@@ -36,6 +36,8 @@ export interface MapLayer {
   hasDateControl: boolean
   attribution?: string
   legend?: LayerLegend
+  /** Off-by-default diagnostic / fill — not the fishing picture. */
+  advanced?: boolean
 }
 
 export interface LayerLegend {

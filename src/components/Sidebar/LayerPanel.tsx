@@ -41,6 +41,7 @@ interface LayerRowProps {
 
 function LayerRow({ layer, onToggle, onOpacity }: LayerRowProps) {
   const [expanded, setExpanded] = useState(false)
+  const loading = useMapStore((s) => !!s.loadingLayers[layer.id])
 
   return (
     <div className={cn('rounded-lg overflow-hidden transition-colors', layer.visible ? 'bg-ocean-750/80' : 'bg-transparent')}>
@@ -65,6 +66,12 @@ function LayerRow({ layer, onToggle, onOpacity }: LayerRowProps) {
         >
           {layer.name}
         </span>
+        {layer.visible && loading && (
+          <span
+            className="w-3 h-3 rounded-full border-2 border-cyan-400/30 border-t-cyan-400 animate-spin flex-shrink-0"
+            aria-label="Loading"
+          />
+        )}
 
         {/* Date indicator */}
         {layer.hasDateControl && (
@@ -124,7 +131,10 @@ interface GroupSectionProps {
 
 function GroupSection({ group, layers, onToggle, onOpacity }: GroupSectionProps) {
   const [open, setOpen] = useState(true)
+  const [advancedOpen, setAdvancedOpen] = useState(() => layers.some((l) => l.advanced && l.visible))
   const config = GROUP_CONFIG[group]
+  const mainLayers = layers.filter((l) => !l.advanced)
+  const advancedLayers = layers.filter((l) => l.advanced)
   const activeCount = layers.filter((l) => l.visible).length
 
   return (
@@ -154,7 +164,7 @@ function GroupSection({ group, layers, onToggle, onOpacity }: GroupSectionProps)
 
       {open && (
         <div className="pl-1 space-y-0.5 mt-0.5">
-          {layers.map((layer) => (
+          {mainLayers.map((layer) => (
             <LayerRow
               key={layer.id}
               layer={layer}
@@ -162,6 +172,33 @@ function GroupSection({ group, layers, onToggle, onOpacity }: GroupSectionProps)
               onOpacity={onOpacity}
             />
           ))}
+          {advancedLayers.length > 0 && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((v) => !v)}
+                className="w-full flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-wider text-slate-600 hover:text-slate-400"
+              >
+                <svg
+                  className={cn('w-3 h-3 transition-transform', advancedOpen ? 'rotate-90' : '')}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                Advanced
+              </button>
+              {advancedOpen && advancedLayers.map((layer) => (
+                <LayerRow
+                  key={layer.id}
+                  layer={layer}
+                  onToggle={onToggle}
+                  onOpacity={onOpacity}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

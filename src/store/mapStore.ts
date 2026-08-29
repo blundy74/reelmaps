@@ -24,8 +24,8 @@ const DEFAULT_VISIBLE: Record<string, boolean> = {
   'salinity': false,
   'currents': false,
   'ssh-anomaly': false,
-  'altimetry': false,
-  'current-arrows': false,
+  'altimetry': true,
+  'current-arrows': true,
   'sst-anomaly': false,
   'sst-goes': false,
   'sargassum': false,
@@ -74,6 +74,7 @@ function mergeLayersFromRegistry(prev?: MapLayer[]): MapLayer[] {
       opacity: old?.opacity ?? DEFAULT_OPACITY[def.id] ?? 0.8,
       hasDateControl: def.dateDependent,
       attribution: def.attribution,
+      advanced: def.advanced,
     }
   })
 }
@@ -135,8 +136,12 @@ interface MapState {
   // SST palette domain (GIBS tiles rematched client-side)
   sstRange: SstRange
 
+  /** In-flight oceanography / overlay fetches — not persisted. */
+  loadingLayers: Record<string, boolean>
+
   // Actions
   setViewState: (vs: Partial<MapState['viewState']>) => void
+  setLayerLoading: (id: string, loading: boolean) => void
   toggleLayer: (id: string) => void
   setLayerOpacity: (id: string, opacity: number) => void
   setBasemap: (id: BasemapId) => void
@@ -185,9 +190,16 @@ export const useMapStore = create<MapState>()(
       flyToTarget: null,
       mapBounds: null,
       sstRange: DEFAULT_SST_RANGE,
+      loadingLayers: {},
 
       setViewState: (vs) =>
         set((state) => ({ viewState: { ...state.viewState, ...vs } })),
+
+      setLayerLoading: (id, loading) =>
+        set((state) => {
+          if (!!state.loadingLayers[id] === loading) return state
+          return { loadingLayers: { ...state.loadingLayers, [id]: loading } }
+        }),
 
       toggleLayer: (id) =>
         set((state) => ({
@@ -220,7 +232,7 @@ export const useMapStore = create<MapState>()(
     }),
     {
       name: 'reelmaps-map-state',
-      version: 13,
+      version: 14,
       migrate: (persisted, version) => {
         const state = persisted as {
           layers?: MapLayer[]
@@ -236,8 +248,16 @@ export const useMapStore = create<MapState>()(
         if (version < 13 && sstRange.preset === 'gom') {
           sstRange = DEFAULT_SST_RANGE
         }
+        const layers = mergeLayersFromRegistry(state.layers)
+        // v14 product lock: arrows + SSH contours on; raster fill / zonal currents off.
+        if (version < 14) {
+          for (const l of layers) {
+            if (l.id === 'current-arrows' || l.id === 'altimetry') l.visible = true
+            if (l.id === 'currents' || l.id === 'ssh-anomaly') l.visible = false
+          }
+        }
         return {
-          layers: mergeLayersFromRegistry(state.layers),
+          layers,
           basemap: state.basemap ?? 'satellite',
           selectedDate: state.selectedDate ?? toISODate(getDefaultDate()),
           sidebarOpen: state.sidebarOpen ?? true,

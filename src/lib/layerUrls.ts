@@ -133,37 +133,35 @@ export function salinityUrl(date: string): string {
   })}`
 }
 
-/** NOAA nowCOAST RTOFS Surface Currents via HRRR tile API (smoothed).
- *  Uses the smooth:// protocol for Gaussian blur on the low-res data. */
+/** NOAA nowCOAST RTOFS surface currents (Advanced raster). Lazy: only fetched when toggled. */
 export function currentsUrl(_date: string): string[] {
   const base = 'smooth://nowcoast.noaa.gov/geoserver/grtofs/wms'
   const params = [
     'SERVICE=WMS', 'VERSION=1.3.0', 'REQUEST=GetMap',
-    'CRS=EPSG%3A3857', 'WIDTH=512', 'HEIGHT=512',
+    'CRS=EPSG%3A3857', 'WIDTH=256', 'HEIGHT=256',
     'FORMAT=image%2Fpng', 'TRANSPARENT=TRUE',
     'LAYERS=rtofs_east_sfc_currents',
   ].join('&')
   return [`${base}?${params}&BBOX={bbox-epsg-3857}`]
 }
 
-/** NASA GIBS Sea Surface Height Anomalies — smoothed via smooth:// protocol. */
+/** NASA GIBS SSH anomaly fill (Advanced heatmap). Lazy: only fetched when toggled. */
 export function sshAnomalyUrl(_date: string): string {
   const base = GIBS_WMS.replace('https://', 'smooth://')
   return `${base}?${wmsParams({
     LAYERS: 'JPL_MEaSUREs_L4_Sea_Surface_Height_Anomalies',
-    WIDTH: '512',
-    HEIGHT: '512',
+    WIDTH: '256',
+    HEIGHT: '256',
   })}`
 }
 
-/** Altimetry overlay — same SSH data but processed through contour:// protocol
- *  for diverging contour-banded visualization (blue=downwelling, red=upwelling). */
+/** SSH contours — isolines with a fat 0-anomaly line. Not a fill. */
 export function altimetryUrl(_date: string): string {
   const base = GIBS_WMS.replace('https://', 'contour://')
   return `${base}?${wmsParams({
     LAYERS: 'JPL_MEaSUREs_L4_Sea_Surface_Height_Anomalies',
-    WIDTH: '512',
-    HEIGHT: '512',
+    WIDTH: '256',
+    HEIGHT: '256',
   })}`
 }
 
@@ -318,6 +316,7 @@ export interface LayerDef {
   maxzoom?: number
   tileSize?: number
   attribution: string
+  advanced?: boolean
 }
 
 export const LAYER_REGISTRY: LayerDef[] = [
@@ -385,40 +384,42 @@ export const LAYER_REGISTRY: LayerDef[] = [
     attribution: 'NASA SMAP via NASA GIBS',
   },
   {
+    id: 'current-arrows',
+    name: 'Current Arrows',
+    description: 'OSCAR surface current arrows — direction and speed (0–4 kt). The fishing layer: edges, flow, and convergence. Land-clipped.',
+    group: 'oceanography',
+    sourceType: 'geojson', // rendered via canvas overlay, not MapLibre layer
+    dateDependent: false,
+    attribution: 'NASA OSCAR via GIBS',
+  },
+  {
+    id: 'altimetry',
+    name: 'SSH Contours',
+    description: 'Sea-surface-height anomaly isolines. Fat white line = 0 anomaly (Loop / eddy edge). Blue = downwelling, orange/red = upwelling. Not a fill.',
+    group: 'oceanography',
+    sourceType: 'raster-wms',
+    dateDependent: false,
+    attribution: 'JPL MEaSUREs via NASA GIBS',
+  },
+  {
     id: 'currents',
-    name: 'Ocean Currents',
-    description: 'NOAA RTOFS/HYCOM surface currents — high resolution (~8 km), real-time ocean forecast. Shows Loop Current, eddies, and drift patterns.',
+    name: 'Ocean Currents (raster)',
+    description: 'Advanced — NOAA RTOFS zonal current fill. The fishing picture is Current Arrows (0–4 kt), not this red-blue field.',
     group: 'oceanography',
     sourceType: 'raster-wms',
     dateDependent: false,
     attribution: 'NOAA nowCOAST RTOFS/HYCOM',
+    advanced: true,
   },
   {
     id: 'ssh-anomaly',
-    name: 'Sea Surface Height',
-    description: 'Sea surface height anomaly — positive = warm-core eddies (Loop Current), negative = cold-core eddies. Critical for finding the Gulf Stream edge.',
+    name: 'SSH Fill',
+    description: 'Advanced — rainbow sea-surface-height fill. Prefer SSH Contours (fat 0 line) on SST instead of a third heatmap.',
     group: 'oceanography',
     sourceType: 'raster-wms',
     dateDependent: false,
     attribution: 'JPL MEaSUREs via NASA GIBS',
-  },
-  {
-    id: 'altimetry',
-    name: 'Altimetry (Contour)',
-    description: 'Satellite altimetry with contour bands — blue = downwelling (cold-core eddies), red = upwelling (warm-core eddies). Sharp bands highlight current edges and convergence zones.',
-    group: 'oceanography',
-    sourceType: 'raster-wms',
-    dateDependent: false,
-    attribution: 'JPL MEaSUREs via NASA GIBS',
-  },
-  {
-    id: 'current-arrows',
-    name: 'Current Arrows',
-    description: 'Geostrophic current direction and speed arrows from OSCAR satellite altimetry. Shows where currents converge (bait concentration) and eddy boundaries.',
-    group: 'oceanography',
-    sourceType: 'geojson', // rendered via canvas overlay, not MapLibre layer
-    dateDependent: false,
-    attribution: 'NOAA OSCAR via ERDDAP',
+    advanced: true,
   },
   {
     id: 'sst-goes',
