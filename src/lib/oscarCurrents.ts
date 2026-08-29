@@ -7,11 +7,19 @@
 import { lookupColorValue, oscarLookup } from './gibsColormaps'
 
 const GIBS_WMS = 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi'
-/** Last date published on GIBS OSCAR WMS (5-day product). */
+/**
+ * Last TIME GIBS actually serves for OSCAR U/V (capabilities default and
+ * last period 2024-07-07/2024-07-17/P5D). Later dates return empty tiles.
+ * Not a live NRT feed — do not invent one.
+ */
 export const OSCAR_GIBS_TIME = '2024-07-17'
 
 const MS_TO_KT = 1.94384
 export const OSCAR_SPEED_MAX_KT = 4
+/** Below this: skip the glyph (noise / nodata). */
+export const OSCAR_SKIP_KT = 0.12
+/** Below this: heads-only, no shaft. Slack eddy — not a 0.2 kt tint. */
+export const OSCAR_SLACK_KT = 0.45
 
 export interface OscarGrid {
   west: number
@@ -147,7 +155,7 @@ export async function fetchOscarGrid(
   vImg.close()
   if (uValid < 8 || vValid < 8) return null
 
-  return {
+  const grid: OscarGrid = {
     west: b.west,
     south: b.south,
     east: b.east,
@@ -158,6 +166,14 @@ export async function fetchOscarGrid(
     v,
     fetchedAt: Date.now(),
   }
+  lastOscarGrid = grid
+  return grid
+}
+
+let lastOscarGrid: OscarGrid | null = null
+
+export function latestOscarGrid(): OscarGrid | null {
+  return lastOscarGrid
 }
 
 export function sampleOscar(
@@ -191,11 +207,12 @@ export function sampleOscar(
   const uu = u00 * (1 - tx) * (1 - ty) + u10 * tx * (1 - ty) + u01 * (1 - tx) * ty + u11 * tx * ty
   const vv = v00 * (1 - tx) * (1 - ty) + v10 * tx * (1 - ty) + v01 * (1 - tx) * ty + v11 * tx * ty
   const speedKt = Math.hypot(uu, vv) * MS_TO_KT
-  if (speedKt < 0.08) return null
+  if (speedKt < OSCAR_SKIP_KT) return null
   const angleDeg = (Math.atan2(uu, vv) * 180) / Math.PI
   return { speedKt, angleDeg }
 }
 
+/** Cursor / Hilton scale only — never paint every shaft with this. */
 export function speedToArrowColor(speedKt: number): string {
   const t = Math.max(0, Math.min(1, speedKt / OSCAR_SPEED_MAX_KT))
   if (t < 0.25) {

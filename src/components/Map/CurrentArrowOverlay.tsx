@@ -11,21 +11,47 @@ import {
   gridCovers,
   oscarLod,
   sampleOscar,
-  speedToArrowColor,
+  OSCAR_SLACK_KT,
+  OSCAR_SPEED_MAX_KT,
   type OscarGrid,
 } from '../../lib/oscarCurrents'
 import { useMapStore } from '../../store/mapStore'
 
-const ARROW_LENGTH_MIN = 8
+const ARROW_LENGTH_MIN = 10
 const ARROW_LENGTH_MAX = 26
-const ARROW_HEAD_SIZE = 4
+const ARROW_HEAD_SIZE = 4.5
+const SLACK_HEAD_SIZE = 3.2
 const MOVE_DEBOUNCE_MS = 280
 const DATA_TTL_MS = 30 * 60_000
+/** One ink for every glyph. Speed is length / heads-only, not a 0–4 kt tint. */
+const ARROW_INK = 'rgba(248, 250, 252, 0.95)'
+const ARROW_HALO = 'rgba(15, 23, 42, 0.8)'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
   visible: boolean
   opacity: number
+}
+
+function drawHead(
+  ctx: CanvasRenderingContext2D,
+  tipX: number,
+  tipY: number,
+  headAngle: number,
+  size: number,
+) {
+  ctx.beginPath()
+  ctx.moveTo(tipX, tipY)
+  ctx.lineTo(
+    tipX - size * Math.cos(headAngle - 0.42),
+    tipY - size * Math.sin(headAngle - 0.42),
+  )
+  ctx.lineTo(
+    tipX - size * Math.cos(headAngle + 0.42),
+    tipY - size * Math.sin(headAngle + 0.42),
+  )
+  ctx.closePath()
+  ctx.fill()
 }
 
 function drawArrow(
@@ -34,35 +60,45 @@ function drawArrow(
   y: number,
   angleDeg: number,
   length: number,
-  color: string,
+  headsOnly: boolean,
 ) {
-  ctx.save()
-  ctx.strokeStyle = color
-  ctx.fillStyle = color
-  ctx.lineWidth = 1.6
-  ctx.lineCap = 'round'
   const screenAngle = ((angleDeg - 90) * Math.PI) / 180
   const dx = Math.cos(screenAngle) * length
   const dy = Math.sin(screenAngle) * length
-  ctx.beginPath()
-  ctx.moveTo(x - dx * 0.4, y - dy * 0.4)
-  ctx.lineTo(x + dx * 0.6, y + dy * 0.6)
-  ctx.stroke()
+  const headAngle = Math.atan2(dy, dx)
+
+  ctx.save()
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+
+  if (headsOnly) {
+    // Slack: chevron only. No shaft, no 0.2 kt tint.
+    ctx.fillStyle = ARROW_HALO
+    drawHead(ctx, x, y, headAngle, SLACK_HEAD_SIZE + 1.1)
+    ctx.fillStyle = ARROW_INK
+    drawHead(ctx, x, y, headAngle, SLACK_HEAD_SIZE)
+    ctx.restore()
+    return
+  }
+
   const tipX = x + dx * 0.6
   const tipY = y + dy * 0.6
-  const headAngle = Math.atan2(dy, dx)
+  ctx.strokeStyle = ARROW_HALO
+  ctx.lineWidth = 3.1
   ctx.beginPath()
-  ctx.moveTo(tipX, tipY)
-  ctx.lineTo(
-    tipX - ARROW_HEAD_SIZE * Math.cos(headAngle - 0.4),
-    tipY - ARROW_HEAD_SIZE * Math.sin(headAngle - 0.4),
-  )
-  ctx.lineTo(
-    tipX - ARROW_HEAD_SIZE * Math.cos(headAngle + 0.4),
-    tipY - ARROW_HEAD_SIZE * Math.sin(headAngle + 0.4),
-  )
-  ctx.closePath()
-  ctx.fill()
+  ctx.moveTo(x - dx * 0.4, y - dy * 0.4)
+  ctx.lineTo(tipX, tipY)
+  ctx.stroke()
+  ctx.strokeStyle = ARROW_INK
+  ctx.lineWidth = 1.55
+  ctx.beginPath()
+  ctx.moveTo(x - dx * 0.4, y - dy * 0.4)
+  ctx.lineTo(tipX, tipY)
+  ctx.stroke()
+  ctx.fillStyle = ARROW_HALO
+  drawHead(ctx, tipX, tipY, headAngle, ARROW_HEAD_SIZE + 0.8)
+  ctx.fillStyle = ARROW_INK
+  drawHead(ctx, tipX, tipY, headAngle, ARROW_HEAD_SIZE)
   ctx.restore()
 }
 
@@ -131,9 +167,10 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
         const ll = map.unproject([sx, sy])
         const sample = sampleOscar(grid, ll.lat, ll.lng)
         if (!sample) continue
-        const t = Math.min(sample.speedKt / 4, 1)
+        const slack = sample.speedKt < OSCAR_SLACK_KT
+        const t = Math.min(sample.speedKt / OSCAR_SPEED_MAX_KT, 1)
         const len = ARROW_LENGTH_MIN + t * (ARROW_LENGTH_MAX - ARROW_LENGTH_MIN)
-        drawArrow(ctx, sx, sy, sample.angleDeg, len, speedToArrowColor(sample.speedKt))
+        drawArrow(ctx, sx, sy, sample.angleDeg, len, slack)
       }
     }
     ctx.globalAlpha = 1
