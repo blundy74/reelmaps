@@ -1,6 +1,7 @@
 import { useMapStore } from '../../store/mapStore'
 import { useWeatherStore } from '../../store/weatherStore'
 import { SST_GRADIENT_CSS, sstLegendLabels } from '../../lib/sstPalette'
+import { OSCAR_AGE_STAMP } from '../../lib/oscarCurrents'
 
 interface LegendDef {
   layerId: string
@@ -8,6 +9,8 @@ interface LegendDef {
   unit: string
   gradient: string
   labels: { value: string; position: string }[]
+  /** Captain-visible age stamp — never ISO in a tooltip. */
+  stamp?: string
   /** If set, check weatherStore overlays instead of mapStore layers */
   isWeatherOverlay?: boolean
 }
@@ -74,6 +77,7 @@ export const LEGENDS: LegendDef[] = [
     layerId: 'current-arrows',
     title: 'Current speed',
     unit: 'kt',
+    stamp: OSCAR_AGE_STAMP,
     gradient: 'linear-gradient(to right, #7dd3fc, #eab308, #f97316, #ef4444)',
     labels: [
       { value: '0', position: '0%' },
@@ -317,6 +321,9 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
             <span className="text-xs font-semibold text-slate-300">{def.title}</span>
             <span className="text-xs text-slate-500 font-mono">{def.unit}</span>
           </div>
+          {def.stamp && (
+            <p className="text-[11px] font-semibold text-cyan-200 mb-1.5 tracking-wide">{def.stamp}</p>
+          )}
           <div
             className="h-2.5 w-full rounded-full"
             style={{ background: def.gradient }}
@@ -363,6 +370,9 @@ export function PinnedLegend() {
             <span className="text-[10px] font-medium text-slate-300 truncate">{def.title}</span>
             <span className="text-[9px] text-slate-500 font-mono flex-shrink-0">{def.unit}</span>
           </div>
+          {def.stamp && (
+            <p className="text-[10px] font-semibold text-cyan-200 mb-1 tracking-wide">{def.stamp}</p>
+          )}
           <div className="h-1.5 w-full rounded-full" style={{ background: def.gradient }} />
           <div className="relative mt-0.5 h-3">
             {def.labels.filter((_, i) => i === 0 || i === def.labels.length - 1 || i === Math.floor(def.labels.length / 2)).map((label) => (

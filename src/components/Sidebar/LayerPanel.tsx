@@ -5,6 +5,7 @@ import { Slider } from '../ui/Slider'
 import { Tooltip } from '../ui/Tooltip'
 import type { MapLayer } from '../../types'
 import { cn } from '../../lib/utils'
+import { OSCAR_AGE_STAMP } from '../../lib/oscarCurrents'
 
 type LayerGroup = MapLayer['group']
 
@@ -60,11 +61,21 @@ function LayerRow({ layer, onToggle, onOpacity }: LayerRowProps) {
         {/* Name */}
         <span
           className={cn(
-            'flex-1 text-sm leading-tight',
+            'flex-1 text-sm leading-tight min-w-0',
             layer.visible ? 'text-slate-200' : 'text-slate-500',
           )}
         >
-          {layer.name}
+          <span className="block truncate">{layer.name}</span>
+          {layer.id === 'current-arrows' && (
+            <span
+              className={cn(
+                'block text-[10px] font-semibold tracking-wide',
+                layer.visible ? 'text-cyan-300/85' : 'text-slate-600',
+              )}
+            >
+              {OSCAR_AGE_STAMP}
+            </span>
+          )}
         </span>
         {layer.visible && loading && (
           <span

@@ -11,6 +11,7 @@
  */
 
 import { applySstScaleUrl } from './sstPalette'
+import { OSCAR_AGE_STAMP } from './oscarCurrents'
 
 const GIBS_WMS = 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi'
 // CoastWatch ERDDAP removed — only supports EPSG:4326, incompatible with MapLibre tiles
@@ -386,7 +387,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
   {
     id: 'current-arrows',
     name: 'Current Arrows',
-    description: 'OSCAR surface current arrows — direction and speed (0–4 kt). The fishing layer: edges, flow, and convergence. Land-clipped.',
+    description: `OSCAR surface current arrows — direction and speed (0–4 kt). ${OSCAR_AGE_STAMP} snapshot, not live. The fishing layer: edges, flow, and convergence. Land-clipped.`,
     group: 'oceanography',
     sourceType: 'geojson', // rendered via canvas overlay, not MapLibre layer
     dateDependent: false,
