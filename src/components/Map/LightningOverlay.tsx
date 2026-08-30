@@ -17,6 +17,7 @@ import {
   GLM_TILE_REFRESH_MS,
   glmFlashesFromApi,
   glmTileCacheBust,
+  hasRealEarthWatermarkHeader,
   hrrrLightningFallbackUrl,
   isUsableRasterTile,
   lightningChipVisible,
@@ -24,6 +25,7 @@ import {
   realEarthGlmProbeUrl,
   type LightningProduct,
 } from '../../lib/lightningOverlay'
+import { registerNorefProtocol } from '../../lib/norefTileProtocol'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
@@ -43,29 +45,24 @@ const GLM_API = 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com/glm/flas
 const FLASH_MAX_AGE = 10000
 const POLL_INTERVAL = 20000
 
-function probeRealEarthImage(url: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    const finish = (ok: boolean) => {
-      img.onload = null
-      img.onerror = null
-      resolve(ok)
-    }
-    const timer = window.setTimeout(() => finish(false), 12000)
-    img.onload = () => {
-      window.clearTimeout(timer)
-      finish(isUsableRasterTile({
-        ok: true,
-        naturalWidth: img.naturalWidth,
-        naturalHeight: img.naturalHeight,
-      }))
-    }
-    img.onerror = () => {
-      window.clearTimeout(timer)
-      finish(false)
-    }
-    img.src = url
-  })
+async function probeRealEarthImage(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(12000),
+      referrer: 'no-referrer',
+      credentials: 'omit',
+    })
+    if (hasRealEarthWatermarkHeader(res.headers)) return false
+    if (!res.ok) return false
+    const buf = await res.arrayBuffer()
+    return isUsableRasterTile({
+      ok: true,
+      contentType: res.headers.get('content-type'),
+      byteLength: buf.byteLength,
+    })
+  } catch {
+    return false
+  }
 }
 
 export default function LightningOverlay({ mapRef, mapReady }: Props) {
@@ -109,6 +106,7 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
   }, [mapRef])
 
   const applyTiles = useCallback((tileUrl: string, product: LightningProduct) => {
+    registerNorefProtocol()
     const map = mapRef.current
     if (!map || !map.isStyleLoaded()) return
 

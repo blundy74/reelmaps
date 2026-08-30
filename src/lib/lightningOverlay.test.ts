@@ -10,6 +10,8 @@ import {
   LIGHTNING_HRRR_TITLE,
   glmFlashesFromApi,
   glmTileCacheBust,
+  hasRealEarthWatermarkHeader,
+  rgbaLooksLikeWatermark,
   hrrrForecastHour,
   hrrrNowOffsetHours,
   isUsableRasterTile,
@@ -28,7 +30,7 @@ function assert(cond: unknown, msg: string): asserts cond {
 
 function main() {
   const glmUrl = realEarthGlmFedUrl(1)
-  assert(glmUrl.includes('realearth.ssec.wisc.edu/tiles/GOESEastGLMFEDRadC'), 'RealEarth FED xyz')
+  assert(glmUrl.startsWith('noref://realearth.ssec.wisc.edu/tiles/GOESEastGLMFEDRadC'), 'noref RealEarth FED')
   assert(glmUrl.includes('{z}/{x}/{y}.png'), 'OSM xyz placeholders')
   assert(glmUrl.includes('?t=1'), 'cache-bust query')
   assert(!usesGibsGlm(glmUrl), 'GIBS GLM density is gone')
@@ -75,6 +77,14 @@ function main() {
   assert(!isUsableRasterTile({ ok: true, contentType: 'text/html', byteLength: 200 }), 'non-image')
   assert(!isUsableRasterTile({ ok: true, contentType: 'image/png', byteLength: 10 }), 'empty body')
   assert(isUsableRasterTile({ ok: true, contentType: 'image/png', byteLength: 400, naturalWidth: 256, naturalHeight: 256 }), 'real png')
+
+  const hdr = { get: (n: string) => (n === 'RE-Watermark' ? 'Size limit exceeded' : null) }
+  assert(hasRealEarthWatermarkHeader(hdr), 'watermark header')
+  const black = new Uint8Array(4 * 4)
+  for (let i = 0; i < black.length; i += 4) black[i + 3] = 255
+  assert(rgbaLooksLikeWatermark(black, 2, 2), 'opaque black is watermark')
+  const clear = new Uint8Array(4 * 4)
+  assert(!rgbaLooksLikeWatermark(clear, 2, 2), 'transparent is not watermark')
 
   const a = glmTileCacheBust(0)
   const b = glmTileCacheBust(GLM_TILE_REFRESH_MS)

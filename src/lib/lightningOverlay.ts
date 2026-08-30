@@ -42,6 +42,10 @@ export function glmTileCacheBust(nowMs = Date.now()): number {
 }
 
 export function realEarthGlmFedUrl(cacheBust: number | string = glmTileCacheBust()): string {
+  return `noref://${REALEARTH_GLM_FED_BASE.replace('https://', '')}/{z}/{x}/{y}.png?t=${cacheBust}`
+}
+
+export function realEarthGlmHttpsUrl(cacheBust: number | string = glmTileCacheBust()): string {
   return `${REALEARTH_GLM_FED_BASE}/{z}/{x}/{y}.png?t=${cacheBust}`
 }
 
@@ -138,6 +142,25 @@ export async function hrrrLightningFallbackUrl(
   const available = manifest.variables?.lightning ?? manifest.forecast_hours ?? []
   if (fh < 0 || fh > 18 || (available.length > 0 && !available.includes(fh))) return null
   return hrrrTileUrl('lightning', manifest.run_date, manifest.run_hour, fh)
+}
+
+export function hasRealEarthWatermarkHeader(headers: { get(name: string): string | null }): boolean {
+  return !!(
+    headers.get('RE-Watermark')
+    || headers.get('RE-Watemark')
+    || headers.get('re-watermark')
+  )
+}
+
+/** Opaque near-black field = RealEarth error/watermark tile, not GLM FED. */
+export function rgbaLooksLikeWatermark(rgba: ArrayLike<number>, width: number, height: number): boolean {
+  const n = width * height
+  if (n <= 0) return false
+  let opaqueBlack = 0
+  for (let i = 0; i < rgba.length; i += 4) {
+    if (rgba[i + 3] > 200 && rgba[i] < 30 && rgba[i + 1] < 30 && rgba[i + 2] < 30) opaqueBlack++
+  }
+  return opaqueBlack / n > 0.55
 }
 
 export function usesGibsGlm(url: string): boolean {
