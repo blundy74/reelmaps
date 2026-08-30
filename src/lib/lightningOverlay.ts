@@ -41,8 +41,13 @@ export function glmTileCacheBust(nowMs = Date.now()): number {
   return Math.floor(nowMs / GLM_TILE_REFRESH_MS)
 }
 
+/** Same-origin Vite proxy when available; noref:// protocol otherwise. */
 export function realEarthGlmFedUrl(cacheBust: number | string = glmTileCacheBust()): string {
-  return `noref://${REALEARTH_GLM_FED_BASE.replace('https://', '')}/{z}/{x}/{y}.png?t=${cacheBust}`
+  const path = `tiles/${REALEARTH_GLM_FED_LAYER}/{z}/{x}/{y}.png?t=${cacheBust}`
+  if (typeof window !== 'undefined' && window.location.port === '5173') {
+    return `/proxy/realearth/${path}`
+  }
+  return `noref://realearth.ssec.wisc.edu/${path}`
 }
 
 export function realEarthGlmHttpsUrl(cacheBust: number | string = glmTileCacheBust()): string {
@@ -51,7 +56,11 @@ export function realEarthGlmHttpsUrl(cacheBust: number | string = glmTileCacheBu
 
 export function realEarthGlmProbeUrl(cacheBust: number | string = glmTileCacheBust()): string {
   const { z, x, y } = REALEARTH_GLM_PROBE
-  return `${REALEARTH_GLM_FED_BASE}/${z}/${x}/${y}.png?t=${cacheBust}`
+  const path = `tiles/${REALEARTH_GLM_FED_LAYER}/${z}/${x}/${y}.png?t=${cacheBust}`
+  if (typeof window !== 'undefined' && window.location.port === '5173') {
+    return `/proxy/realearth/${path}`
+  }
+  return `https://realearth.ssec.wisc.edu/${path}`
 }
 
 export function lightningLegend(product: LightningProduct): {

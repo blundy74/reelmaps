@@ -29,6 +29,7 @@ import type { SavedSpot } from '../../lib/apiClient'
 import { registerSmoothProtocol } from '../../lib/smoothTileProtocol'
 import { registerContourProtocol } from '../../lib/contourTileProtocol'
 import { registerSstScaleProtocol } from '../../lib/sstScaleProtocol'
+import { registerNorefProtocol } from '../../lib/norefTileProtocol'
 import { activeSstLayerId, sampleSstAtPoint } from '../../lib/sstPalette'
 import { fetchDepthFeet, formatDepthFeet } from '../../lib/oceanDepth'
 import { displaySpotName } from '../../lib/spotDisplay'
@@ -689,6 +690,7 @@ export default function FishingMap() {
     registerSmoothProtocol()
     registerContourProtocol()
     registerSstScaleProtocol()
+    registerNorefProtocol()
 
     const { viewState, basemap: initialBasemap } = useMapStore.getState()
     const map = new maplibregl.Map({

@@ -30,7 +30,8 @@ function assert(cond: unknown, msg: string): asserts cond {
 
 function main() {
   const glmUrl = realEarthGlmFedUrl(1)
-  assert(glmUrl.startsWith('noref://realearth.ssec.wisc.edu/tiles/GOESEastGLMFEDRadC'), 'noref RealEarth FED')
+  assert(glmUrl.includes('tiles/GOESEastGLMFEDRadC/{z}/{x}/{y}.png'), 'RealEarth FED xyz')
+  assert(glmUrl.startsWith('noref://') || glmUrl.startsWith('/proxy/realearth/'), 'not a raw third-party image URL')
   assert(glmUrl.includes('{z}/{x}/{y}.png'), 'OSM xyz placeholders')
   assert(glmUrl.includes('?t=1'), 'cache-bust query')
   assert(!usesGibsGlm(glmUrl), 'GIBS GLM density is gone')
@@ -40,6 +41,7 @@ function main() {
   const probe = realEarthGlmProbeUrl(1)
   assert(probe.includes('/5/8/13.png'), 'Gulf probe tile')
   assert(!probe.includes('{z}'), 'probe is a concrete tile')
+  assert(probe.includes('GOESEastGLMFEDRadC'), 'probe is RealEarth FED')
 
   const radarOnly = [
     { id: 'radar', visible: true },
