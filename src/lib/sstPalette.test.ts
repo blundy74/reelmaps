@@ -9,6 +9,7 @@ import {
   parseSstScaleUrl,
   applySstScaleUrl,
   fahrenheitToCelsius,
+  sstPaintRange,
 } from './sstPalette'
 
 function assert(cond: unknown, msg: string): asserts cond {
@@ -57,10 +58,15 @@ function main() {
   assert(pack(r86) !== pack(r87), 'recolor Loop/sail: 86 vs 87')
   assert(pack(r87) !== pack(r88), 'recolor Loop/sail: 87 vs 88')
 
-  const url = applySstScaleUrl('https://gibs.earthdata.nasa.gov/wms/x', 78, 86)
-  assert(url.startsWith('sstscale://78,86,b/'), `band token ${url}`)
+  const gomPaint = sstPaintRange({ preset: 'gom', minF: 78, maxF: 86 })
+  assert(gomPaint.maxF === 90, `Loop/sail paint must extend past 86: ${gomPaint.maxF}`)
+  assert(pack(fishingBandColor(86, gomPaint.minF, gomPaint.maxF)) !== pack(fishingBandColor(87, gomPaint.minF, gomPaint.maxF)), 'paint 86 vs 87')
+  assert(pack(fishingBandColor(87, gomPaint.minF, gomPaint.maxF)) !== pack(fishingBandColor(88, gomPaint.minF, gomPaint.maxF)), 'paint 87 vs 88')
+
+  const url = applySstScaleUrl('https://gibs.earthdata.nasa.gov/wms/x', 78, 90)
+  assert(url.startsWith('sstscale://78,90,v17/'), `band token ${url}`)
   const parsed = parseSstScaleUrl(url)
-  assert(parsed != null && parsed.minF === 78 && parsed.maxF === 86, 'parse band url')
+  assert(parsed != null && parsed.minF === 78 && parsed.maxF === 90, 'parse band url')
   assert(parsed!.httpsUrl.startsWith('https://'), 'https restored')
   const legacy = parseSstScaleUrl('sstscale://78,86/gibs.earthdata.nasa.gov/wms/x')
   assert(legacy != null && legacy.minF === 78, 'legacy url still parses')

@@ -4,7 +4,7 @@
  * (not a 12-item layer-pill rail, not 6 display modes).
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useWeatherStore } from '../../store/weatherStore'
 import { useMapStore } from '../../store/mapStore'
 import { useAuthStore } from '../../store/authStore'
@@ -112,9 +112,6 @@ export default function WeatherSidebar({ open, onClose }: Props) {
     setPanelOpen,
     overlays,
     toggleOverlay,
-    current,
-    loading,
-    location,
     fetchWeather,
   } = useWeatherStore()
 
@@ -128,22 +125,14 @@ export default function WeatherSidebar({ open, onClose }: Props) {
   const setShowAuthModal = useAuthStore((s) => s.setShowAuthModal)
   const isPremium = user?.isPremium ?? false
 
-  const initialFetchDone = useRef(false)
-
   useEffect(() => {
     if (!open) return
-    const loc = droppedPin ?? clickedPoint
-    if (loc) fetchWeather(loc.lat, loc.lng)
-  }, [open, droppedPin, clickedPoint, fetchWeather])
-
-  useEffect(() => {
-    if (!open || current || loading || location || initialFetchDone.current) return
-    initialFetchDone.current = true
-    const timer = setTimeout(() => {
-      fetchWeather(viewState.latitude, viewState.longitude)
-    }, 800)
-    return () => clearTimeout(timer)
-  }, [open, current, loading, location, fetchWeather, viewState.latitude, viewState.longitude])
+    const loc = droppedPin ?? clickedPoint ?? { lat: viewState.latitude, lng: viewState.longitude }
+    const timer = window.setTimeout(() => {
+      fetchWeather(loc.lat, loc.lng)
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [open, droppedPin, clickedPoint, fetchWeather, viewState.latitude, viewState.longitude])
 
   const overlayById = (id: string) => overlays.find((o) => o.id === id)
   const layerById = (id: string) => layers.find((l) => l.id === id)

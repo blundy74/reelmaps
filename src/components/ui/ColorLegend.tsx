@@ -1,6 +1,6 @@
 import { useMapStore } from '../../store/mapStore'
 import { useWeatherStore } from '../../store/weatherStore'
-import { SST_GRADIENT_CSS, sstLegendGradient, sstLegendLabels } from '../../lib/sstPalette'
+import { SST_GRADIENT_CSS, sstLegendGradient, sstLegendLabels, sstPaintRange } from '../../lib/sstPalette'
 import { OSCAR_AGE_STAMP } from '../../lib/oscarCurrents'
 
 interface LegendDef {
@@ -312,7 +312,10 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
     }
     if ((def.layerId === 'sst-mur' || def.layerId === 'sst-goes') && sstEmpty) return false
     return layers.find((l) => l.id === def.layerId)?.visible
-  }).map((def) => withSshStamp(withSstRange(def, sstRange.minF, sstRange.maxF), sshStamp))
+  }).map((def) => {
+    const paint = sstPaintRange(sstRange)
+    return withSshStamp(withSstRange(def, paint.minF, paint.maxF), sshStamp)
+  })
 
   if (hidden || !activeLegends.length) return null
 
@@ -362,7 +365,10 @@ export function PinnedLegend() {
     }
     if ((def.layerId === 'sst-mur' || def.layerId === 'sst-goes') && sstEmpty) return false
     return layers.find((l) => l.id === def.layerId)?.visible
-  }).map((def) => withSshStamp(withSstRange(def, sstRange.minF, sstRange.maxF), sshStamp))
+  }).map((def) => {
+    const paint = sstPaintRange(sstRange)
+    return withSshStamp(withSstRange(def, paint.minF, paint.maxF), sshStamp)
+  })
 
   if (!activeLegends.length) return null
 

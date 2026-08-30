@@ -15,8 +15,12 @@ import { GIBS_SST_ENTRIES } from './gibsSstColormap'
 
 export const SST_GOM_MIN_F = 78
 export const SST_GOM_MAX_F = 86
+/** Paint domain for Loop/sail — lock chip stays 78–86 but late-August 87–90 must stay distinct. */
+export const SST_GOM_PAINT_MAX_F = 90
 export const SST_WIDE_MIN_F = 50
 export const SST_WIDE_MAX_F = 90
+/** Cache-bust token so MapLibre rebuilds rematched tiles after palette changes. */
+export const SST_SCALE_TOKEN = 'v17'
 /** Minimum fishing window — tight enough that 1°F Gulf structure still paints. */
 export const SST_MIN_SPAN_F = 1.5
 /** Cap so a mixed-basin view cannot crush the Gulf to one red. */
@@ -45,6 +49,14 @@ export function activeSstLayerId(
   if (layers.some((l) => l.id === 'sst-goes' && l.visible)) return 'sst-goes'
   if (layers.some((l) => l.id === 'sst-mur' && l.visible)) return 'sst-mur'
   return null
+}
+
+/** Domain actually rematched onto tiles / legend. Loop/sail chip stays 78–86. */
+export function sstPaintRange(range: SstRange): { minF: number; maxF: number } {
+  if (range.preset === 'gom') {
+    return { minF: SST_GOM_MIN_F, maxF: SST_GOM_PAINT_MAX_F }
+  }
+  return { minF: range.minF, maxF: range.maxF }
 }
 
 /** Continuous rainbow — used only as a fallback lerp. Map paint uses FISHING_BANDS. */
@@ -219,12 +231,12 @@ export function recolorSstPixel(
   return { r: c.r, g: c.g, b: c.b, a: 230 }
 }
 
-/** `b` token = discrete fishing bands — busts MapLibre tile cache on palette change. */
+/** Token in the protocol URL busts MapLibre's tile cache when the palette changes. */
 export function applySstScaleUrl(url: string, minF: number, maxF: number): string {
   const a = Number(minF.toFixed(1))
   const b = Number(maxF.toFixed(1))
   if (url.startsWith('https://')) {
-    return url.replace('https://', `sstscale://${a},${b},b/`)
+    return url.replace('https://', `sstscale://${a},${b},${SST_SCALE_TOKEN}/`)
   }
   return url
 }

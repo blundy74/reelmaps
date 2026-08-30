@@ -1,10 +1,9 @@
 /**
  * SST color-range chips for the right rail.
- * Fit-to-view (p5–p95 of water on screen) is the default so late-summer
- * 88s are not clipped. Loop / sail locks 78–86 when the Gulf is in that band.
- * Wide is the global 50–90 rainbow. Date scrub keeps the locked window.
- * Auto-fit on first show / imagery switch lives in useSstAutoFit; this
- * chip is the explicit re-sample.
+ * Fit-to-view (inner percentiles of water on screen) is the default so late-summer
+ * 88s are not clipped. Loop / sail locks the named 78–86 chip (paint extends to 90
+ * so August 87–88 still read). Wide is the global 50–90 rainbow.
+ * The Fit button label is always "Fit". The numeric window is subtitle text.
  */
 
 import { useState, type ReactNode } from 'react'
@@ -23,13 +22,11 @@ function Chip({
   active,
   disabled,
   children,
-  subtitle,
   onClick,
 }: {
   active: boolean
   disabled?: boolean
   children: ReactNode
-  subtitle?: string
   onClick: () => void
 }) {
   return (
@@ -45,10 +42,7 @@ function Chip({
         disabled && 'opacity-50 cursor-wait',
       )}
     >
-      <span className="block">{children}</span>
-      {subtitle != null && subtitle !== '' && (
-        <span className="block text-[8px] font-normal opacity-80 leading-none mt-0.5">{subtitle}</span>
-      )}
+      {children}
     </button>
   )
 }
@@ -100,7 +94,6 @@ export default function SstRangeChips() {
         <Chip
           active={sstRange.preset === 'fit'}
           disabled={fitting || !mapBounds}
-          subtitle={fitSubtitle}
           onClick={() => { void handleFitChip() }}
         >
           Fit
@@ -124,9 +117,12 @@ export default function SstRangeChips() {
           Wide 50–90°F
         </Chip>
       </div>
-      <p className="text-[9px] text-slate-600 mt-1 px-0.5 leading-snug">
-        Fit is the default — inner percentiles of water in view so 1°F rips paint. Date scrub keeps this window; tap Fit to re-sample.
-        Loop / sail locks 78–86. Wide is the global rainbow.
+      <p className="text-[9px] text-slate-500 mt-1 px-0.5 leading-snug">
+        <span className="text-slate-400 font-medium">Fit</span>
+        {': '}
+        {fitSubtitle}
+        {' — inner percentiles of water in view so 1°F rips paint. Pan/fly re-samples. '}
+        Loop / sail locks the 78–86 chip (paint keeps 87–90 distinct). Wide is the global rainbow.
       </p>
       {fitError && (
         <p className="text-[9px] text-amber-400/90 mt-1 px-0.5">{fitError}</p>

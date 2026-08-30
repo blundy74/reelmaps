@@ -177,11 +177,13 @@ export default function HotspotOverlay({ mapRef, variant = 'hotspot', mapReady }
           setHotspotEmpty(false)
           return
         }
-        if (results.every((r) => r === false)) setHotspotEmpty(true)
+        // 404 / tiny PNG / probe failure all mean no ink for this view/date.
+        setHotspotEmpty(true)
       })()
     }
 
     if (visible && variant === 'hotspot') {
+      probeEmpty()
       map.once('idle', probeEmpty)
       map.on('moveend', probeEmpty)
     }

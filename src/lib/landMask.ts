@@ -351,10 +351,87 @@ export async function clipWavesToCoast(
   eraseWavesOverLand(ctx, map, land, options)
 }
 
+const MERCATOR_MAX = 20037508.342789244
+
+function xToLng(x: number): number {
+  return (x * 180) / MERCATOR_MAX
+}
+
+function yToLat(y: number): number {
+  const lat = (y * 180) / MERCATOR_MAX
+  return (Math.atan(Math.sinh((lat * Math.PI) / 180)) * 180) / Math.PI
+}
+
+function lngToX(lng: number): number {
+  return (lng * MERCATOR_MAX) / 180
+}
+
+function latToY(lat: number): number {
+  const clamped = Math.max(-85.05112878, Math.min(85.05112878, lat))
+  const y = Math.log(Math.tan(((90 + clamped) * Math.PI) / 360)) / (Math.PI / 180)
+  return (y * MERCATOR_MAX) / 180
+}
+
+export function parseWmsBbox3857(url: string): { xmin: number; ymin: number; xmax: number; ymax: number } | null {
+  const m = url.match(/BBOX=([^&]+)/i)
+  if (!m) return null
+  const raw = decodeURIComponent(m[1])
+  if (raw.includes('{')) return null
+  const parts = raw.split(',').map(Number)
+  if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) return null
+  return { xmin: parts[0], ymin: parts[1], xmax: parts[2], ymax: parts[3] }
+}
+
 /**
- * Paint opaque pixels on land (for the particle bitmap).
- * Inverse of the water clip so crescents and the color field share a coastline.
+ * Punch land out of a WMS SST tile using the existing 10m land mask.
+ * Cheap: one offscreen canvas fill per tile, no new data source.
  */
+export async function eraseLandFromTile(
+  imageData: ImageData,
+  bbox: { xmin: number; ymin: number; xmax: number; ymax: number },
+): Promise<void> {
+  const land = await getLandData()
+  const w = imageData.width
+  const h = imageData.height
+  const west = xToLng(bbox.xmin)
+  const east = xToLng(bbox.xmax)
+  const south = yToLat(bbox.ymin)
+  const north = yToLat(bbox.ymax)
+  if (!(east > west) || !(north > south)) return
+
+  const mask = document.createElement('canvas')
+  mask.width = w
+  mask.height = h
+  const ctx = mask.getContext('2d')
+  if (!ctx) return
+  ctx.fillStyle = '#000'
+  ctx.beginPath()
+  let traced = 0
+  for (const ring of land.rings) {
+    if (ring.maxLng < west || ring.minLng > east || ring.maxLat < south || ring.minLat > north) continue
+    const coords = clipRingToBBox(ring.coords, west - 0.05, east + 0.05, south - 0.05, north + 0.05)
+    if (coords.length < 3) continue
+    const x0 = ((lngToX(coords[0][0]) - bbox.xmin) / (bbox.xmax - bbox.xmin)) * w
+    const y0 = ((bbox.ymax - latToY(coords[0][1])) / (bbox.ymax - bbox.ymin)) * h
+    ctx.moveTo(x0, y0)
+    for (let i = 1; i < coords.length; i++) {
+      const x = ((lngToX(coords[i][0]) - bbox.xmin) / (bbox.xmax - bbox.xmin)) * w
+      const y = ((bbox.ymax - latToY(coords[i][1])) / (bbox.ymax - bbox.ymin)) * h
+      ctx.lineTo(x, y)
+    }
+    ctx.closePath()
+    traced++
+  }
+  if (traced === 0) return
+  ctx.fill('evenodd')
+  const landPx = ctx.getImageData(0, 0, w, h).data
+  const px = imageData.data
+  for (let i = 0; i < px.length; i += 4) {
+    if (landPx[i + 3] > 20) px[i + 3] = 0
+  }
+}
+
+/** Paint opaque pixels on land (for the particle bitmap). */
 export async function paintLandMask(
   ctx: CanvasRenderingContext2D,
   map: maplibregl.Map,

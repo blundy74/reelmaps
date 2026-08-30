@@ -100,7 +100,7 @@ export default function MapApp() {
           </button>
 
           {/* Tool buttons — below the floating icons */}
-          <div className="absolute top-[60px] md:top-16 right-3 z-20 flex flex-col gap-2">
+          <div className="absolute top-[60px] md:top-16 right-3 z-30 flex flex-col gap-2">
             <ShareButton />
 
             <button

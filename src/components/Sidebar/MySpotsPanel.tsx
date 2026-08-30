@@ -177,7 +177,7 @@ function SpotRow({ spot, onEdit, selectMode, selected, onToggleSelect }: {
   const iconDef = getSpotIcon(spot.icon || 'fish')
 
   const handleDelete = () => {
-    if (window.confirm(`Delete "${spot.name}"?`)) {
+    if (window.confirm(`Delete "${displaySpotName(spot.name)}"?`)) {
       removeSpot(spot.id)
     }
   }
@@ -249,7 +249,7 @@ export default function MySpotsPanel({ onImportClick }: { onImportClick?: () => 
   useEffect(() => { fetchSpots() }, [fetchSpots])
 
   const filtered = search.trim()
-    ? spots.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()))
+    ? spots.filter((s) => displaySpotName(s.name).toLowerCase().includes(search.toLowerCase()) || s.name.toLowerCase().includes(search.toLowerCase()))
     : spots
 
   const toggleSelect = (id: string) => {

@@ -10,7 +10,7 @@
  *  - Esri World Imagery XYZ: https://server.arcgisonline.com
  */
 
-import { applySstScaleUrl } from './sstPalette'
+import { applySstScaleUrl, sstPaintRange } from './sstPalette'
 import { OSCAR_AGE_STAMP } from './oscarCurrents'
 
 const GIBS_WMS = 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi'
@@ -585,9 +585,14 @@ const SST_SCALE_LAYERS = new Set(['sst-mur', 'sst-goes'])
 export function tilesForLayer(
   layerId: string,
   date: string,
-  sstRange?: { minF: number; maxF: number },
+  sstRange?: { minF: number; maxF: number; preset?: 'gom' | 'wide' | 'fit' },
 ): string[] {
   const urls = buildTileUrl(layerId, date)
   if (!sstRange || !SST_SCALE_LAYERS.has(layerId)) return urls
-  return urls.map((u) => applySstScaleUrl(u, sstRange.minF, sstRange.maxF))
+  const paint = sstPaintRange({
+    preset: sstRange.preset ?? 'fit',
+    minF: sstRange.minF,
+    maxF: sstRange.maxF,
+  })
+  return urls.map((u) => applySstScaleUrl(u, paint.minF, paint.maxF))
 }

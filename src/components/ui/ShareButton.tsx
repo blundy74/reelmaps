@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useMapStore } from '../../store/mapStore'
 import { syncStateToUrl } from '../../lib/urlSync'
 
@@ -27,8 +28,15 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
+const TOAST_MS = 3200
+
 export default function ShareButton() {
   const [copied, setCopied] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [toastPos, setToastPos] = useState<{ top: number; left: number } | null>(null)
+  const timerRef = useRef<number>(0)
+
+  useEffect(() => () => window.clearTimeout(timerRef.current), [])
 
   const handleCopy = useCallback(async () => {
     const { viewState, basemap, layers } = useMapStore.getState()
@@ -40,13 +48,20 @@ export default function ShareButton() {
     )
     const ok = await copyText(window.location.href)
     if (!ok) return
+    const el = btnRef.current
+    if (el) {
+      const r = el.getBoundingClientRect()
+      setToastPos({ top: r.bottom + 8, left: r.left + r.width / 2 })
+    }
     setCopied(true)
-    window.setTimeout(() => setCopied(false), 3200)
+    window.clearTimeout(timerRef.current)
+    timerRef.current = window.setTimeout(() => setCopied(false), TOAST_MS)
   }, [])
 
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         onClick={() => { void handleCopy() }}
         title="Copy shareable link"
         className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all shadow-lg border glass border-ocean-600 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40"
@@ -58,13 +73,15 @@ export default function ShareButton() {
         {copied ? 'Copied!' : 'Share'}
       </button>
 
-      {copied && (
+      {copied && toastPos && createPortal(
         <div
-          className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-md bg-cyan-600 text-white text-[11px] font-medium whitespace-nowrap shadow-lg z-50 animate-fade-in"
+          className="fixed px-2.5 py-1 rounded-md bg-cyan-600 text-white text-[11px] font-medium whitespace-nowrap shadow-lg pointer-events-none"
+          style={{ top: toastPos.top, left: toastPos.left, transform: 'translateX(-50%)', zIndex: 80 }}
           role="status"
         >
           Link copied
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
