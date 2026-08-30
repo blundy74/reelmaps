@@ -75,6 +75,7 @@ function mergeLayersFromRegistry(prev?: MapLayer[]): MapLayer[] {
       hasDateControl: def.dateDependent,
       attribution: def.attribution,
       advanced: def.advanced,
+      unlisted: def.unlisted,
     }
   })
 }
@@ -139,9 +140,14 @@ interface MapState {
   /** In-flight oceanography / overlay fetches — not persisted. */
   loadingLayers: Record<string, boolean>
 
+  /** Captain-facing SSH field stamp, e.g. "SSH 25 Mar 2026". */
+  sshStamp: string | null
+  sshSource: 'erddap' | 'gibs' | null
+
   // Actions
   setViewState: (vs: Partial<MapState['viewState']>) => void
   setLayerLoading: (id: string, loading: boolean) => void
+  setSshMeta: (stamp: string | null, source: 'erddap' | 'gibs' | null) => void
   toggleLayer: (id: string) => void
   setLayerOpacity: (id: string, opacity: number) => void
   setBasemap: (id: BasemapId) => void
@@ -191,6 +197,8 @@ export const useMapStore = create<MapState>()(
       mapBounds: null,
       sstRange: DEFAULT_SST_RANGE,
       loadingLayers: {},
+      sshStamp: null,
+      sshSource: null,
 
       setViewState: (vs) =>
         set((state) => ({ viewState: { ...state.viewState, ...vs } })),
@@ -200,6 +208,8 @@ export const useMapStore = create<MapState>()(
           if (!!state.loadingLayers[id] === loading) return state
           return { loadingLayers: { ...state.loadingLayers, [id]: loading } }
         }),
+
+      setSshMeta: (stamp, source) => set({ sshStamp: stamp, sshSource: source }),
 
       toggleLayer: (id) =>
         set((state) => ({
@@ -232,7 +242,7 @@ export const useMapStore = create<MapState>()(
     }),
     {
       name: 'reelmaps-map-state',
-      version: 14,
+      version: 15,
       migrate: (persisted, version) => {
         const state = persisted as {
           layers?: MapLayer[]
@@ -249,8 +259,8 @@ export const useMapStore = create<MapState>()(
           sstRange = DEFAULT_SST_RANGE
         }
         const layers = mergeLayersFromRegistry(state.layers)
-        // v14 product lock: arrows + SSH contours on; raster fill / zonal currents off.
-        if (version < 14) {
+        // v14/v15: arrows + SSH contours on; raster fill / zonal currents off and unlisted.
+        if (version < 15) {
           for (const l of layers) {
             if (l.id === 'current-arrows' || l.id === 'altimetry') l.visible = true
             if (l.id === 'currents' || l.id === 'ssh-anomaly') l.visible = false

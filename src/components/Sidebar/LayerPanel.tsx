@@ -40,6 +40,21 @@ interface LayerRowProps {
   onOpacity: (id: string, v: number) => void
 }
 
+function SshRowStamp({ visible }: { visible: boolean }) {
+  const stamp = useMapStore((s) => s.sshStamp)
+  if (!stamp) return null
+  return (
+    <span
+      className={cn(
+        'block text-[10px] font-semibold tracking-wide',
+        visible ? 'text-cyan-300/85' : 'text-slate-600',
+      )}
+    >
+      {stamp}
+    </span>
+  )
+}
+
 function LayerRow({ layer, onToggle, onOpacity }: LayerRowProps) {
   const [expanded, setExpanded] = useState(false)
   const loading = useMapStore((s) => !!s.loadingLayers[layer.id])
@@ -75,6 +90,9 @@ function LayerRow({ layer, onToggle, onOpacity }: LayerRowProps) {
             >
               {OSCAR_AGE_STAMP}
             </span>
+          )}
+          {layer.id === 'altimetry' && (
+            <SshRowStamp visible={layer.visible} />
           )}
         </span>
         {layer.visible && loading && (
@@ -142,11 +160,9 @@ interface GroupSectionProps {
 
 function GroupSection({ group, layers, onToggle, onOpacity }: GroupSectionProps) {
   const [open, setOpen] = useState(true)
-  const [advancedOpen, setAdvancedOpen] = useState(() => layers.some((l) => l.advanced && l.visible))
   const config = GROUP_CONFIG[group]
-  const mainLayers = layers.filter((l) => !l.advanced)
-  const advancedLayers = layers.filter((l) => l.advanced)
-  const activeCount = layers.filter((l) => l.visible).length
+  const listed = layers.filter((l) => !l.unlisted)
+  const activeCount = listed.filter((l) => l.visible).length
 
   return (
     <div className="mb-1">
@@ -175,7 +191,7 @@ function GroupSection({ group, layers, onToggle, onOpacity }: GroupSectionProps)
 
       {open && (
         <div className="pl-1 space-y-0.5 mt-0.5">
-          {mainLayers.map((layer) => (
+          {listed.map((layer) => (
             <LayerRow
               key={layer.id}
               layer={layer}
@@ -183,33 +199,6 @@ function GroupSection({ group, layers, onToggle, onOpacity }: GroupSectionProps)
               onOpacity={onOpacity}
             />
           ))}
-          {advancedLayers.length > 0 && (
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => setAdvancedOpen((v) => !v)}
-                className="w-full flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-wider text-slate-600 hover:text-slate-400"
-              >
-                <svg
-                  className={cn('w-3 h-3 transition-transform', advancedOpen ? 'rotate-90' : '')}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-                Advanced
-              </button>
-              {advancedOpen && advancedLayers.map((layer) => (
-                <LayerRow
-                  key={layer.id}
-                  layer={layer}
-                  onToggle={onToggle}
-                  onOpacity={onOpacity}
-                />
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -304,7 +293,7 @@ export default function LayerPanel() {
         <div className="px-1">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">Data Layers</p>
           {GROUP_ORDER.map((group) => {
-            const groupLayers = layers.filter((l) => l.group === group)
+            const groupLayers = layers.filter((l) => l.group === group && !l.unlisted)
             if (!groupLayers.length) return null
             return (
               <GroupSection

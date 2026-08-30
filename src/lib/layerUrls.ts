@@ -318,6 +318,8 @@ export interface LayerDef {
   tileSize?: number
   attribution: string
   advanced?: boolean
+  /** Default-off rasters kept in the registry but not listed in the panel. */
+  unlisted?: boolean
 }
 
 export const LAYER_REGISTRY: LayerDef[] = [
@@ -396,31 +398,33 @@ export const LAYER_REGISTRY: LayerDef[] = [
   {
     id: 'altimetry',
     name: 'SSH Contours',
-    description: 'Sea-surface-height anomaly isolines. Fat white line = 0 anomaly (Loop / eddy edge). Blue = downwelling, orange/red = upwelling. Not a fill.',
+    description: 'Sea-level-anomaly isolines at 10 cm. Fat line = 17 cm (Leben Loop / eddy core). Thin 0 is optional. One ink, lines only — not a fill.',
     group: 'oceanography',
-    sourceType: 'raster-wms',
+    sourceType: 'geojson',
     dateDependent: false,
-    attribution: 'JPL MEaSUREs via NASA GIBS',
+    attribution: 'NOAA NESDIS SLA via CoastWatch ERDDAP (GIBS MEaSUREs fallback)',
   },
   {
     id: 'currents',
     name: 'Ocean Currents (raster)',
-    description: 'Advanced — NOAA RTOFS zonal current fill. The fishing picture is Current Arrows (0–4 kt), not this red-blue field.',
+    description: 'Unlisted — NOAA RTOFS zonal current fill. The fishing picture is Current Arrows (0–4 kt), not this red-blue field.',
     group: 'oceanography',
     sourceType: 'raster-wms',
     dateDependent: false,
     attribution: 'NOAA nowCOAST RTOFS/HYCOM',
     advanced: true,
+    unlisted: true,
   },
   {
     id: 'ssh-anomaly',
     name: 'SSH Fill',
-    description: 'Advanced — rainbow sea-surface-height fill. Prefer SSH Contours (fat 0 line) on SST instead of a third heatmap.',
+    description: 'Unlisted — rainbow sea-surface-height fill. Prefer SSH Contours (17 cm Loop) on SST instead of a third heatmap.',
     group: 'oceanography',
     sourceType: 'raster-wms',
     dateDependent: false,
     attribution: 'JPL MEaSUREs via NASA GIBS',
     advanced: true,
+    unlisted: true,
   },
   {
     id: 'sst-goes',
@@ -554,7 +558,7 @@ export function buildTileUrl(layerId: string, date: string): string[] {
     case 'ssh-anomaly':
       return [sshAnomalyUrl(date)]
     case 'altimetry':
-      return [altimetryUrl(date)]
+      return [] // canvas overlay — one viewport grid, not tiled contours
     case 'sargassum':
       return [sargassumUrl(date)]
     case 'sargassum-daily':

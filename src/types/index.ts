@@ -38,6 +38,8 @@ export interface MapLayer {
   legend?: LayerLegend
   /** Off-by-default diagnostic / fill — not the fishing picture. */
   advanced?: boolean
+  /** Kept in store, not shown in LayerPanel (Oceanography Advanced rasters). */
+  unlisted?: boolean
 }
 
 export interface LayerLegend {

@@ -24,7 +24,6 @@ const IMAGERY = [
   { id: 'sst-goes', name: 'SST Daily' },
   { id: 'chlorophyll', name: 'Chl-a' },
   { id: 'true-color-viirs', name: 'True Color' },
-  { id: 'currents', name: 'Currents' },
   { id: 'sargassum', name: 'Weedlines' },
 ] as const
 

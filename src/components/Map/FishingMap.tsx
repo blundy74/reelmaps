@@ -32,6 +32,7 @@ import { registerSstScaleProtocol } from '../../lib/sstScaleProtocol'
 import { useSstAutoFit } from '../../hooks/useSstAutoFit'
 import CurrentArrowOverlay from './CurrentArrowOverlay'
 import CurrentSpeedScale from './CurrentSpeedScale'
+import SshContourOverlay from './SshContourOverlay'
 import { SPOT_ICONS, renderIconToImageData, getSpotIcon } from '../../lib/spotIcons'
 
 // ── Layer z-order (lower = rendered first / underneath) ─────────────────────
@@ -50,7 +51,6 @@ const LAYER_ORDER = [
   'salinity',
   'currents',
   'ssh-anomaly',
-  'altimetry',
   'current-arrows',
   'openseamap',
   'fishing-spots',
@@ -73,7 +73,6 @@ const RASTER_LAYERS = new Set([
   'salinity',
   'currents',
   'ssh-anomaly',
-  'altimetry',
 ])
 
 // Layers whose tile URLs are WMS (contain bbox placeholder)
@@ -89,7 +88,6 @@ const WMS_LAYERS = new Set([
   'salinity',
   'currents',
   'ssh-anomaly',
-  'altimetry',
 ])
 
 export default function FishingMap() {
@@ -132,7 +130,6 @@ export default function FishingMap() {
   const OCEAN_RASTER_MAXZOOM: Record<string, number> = {
     currents: 6,
     'ssh-anomaly': 5,
-    altimetry: 6,
   }
 
   // Low-resolution oceanographic layers that benefit from bilinear smoothing
@@ -1182,6 +1179,12 @@ export default function FishingMap() {
       <HotspotOverlay mapRef={mapRef} variant="sargassum" mapReady={mapReady} />
       <HotspotOverlay mapRef={mapRef} variant="sargassum-daily" mapReady={mapReady} />
       <LightningOverlay mapRef={mapRef} mapReady={mapReady} />
+      <SshContourOverlay
+        mapRef={mapRef}
+        mapReady={mapReady}
+        visible={getLayer('altimetry')?.visible ?? false}
+        opacity={getLayer('altimetry')?.opacity ?? 0.75}
+      />
       <CurrentArrowOverlay
         mapRef={mapRef}
         visible={getLayer('current-arrows')?.visible ?? false}

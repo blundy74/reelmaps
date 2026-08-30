@@ -88,12 +88,12 @@ export const LEGENDS: LegendDef[] = [
   {
     layerId: 'altimetry',
     title: 'SSH contours',
-    unit: '0 fat',
-    gradient: 'linear-gradient(to right, #2563eb, #e2e8f0 50%, #dc2626)',
+    unit: '17 cm Loop',
+    gradient: 'linear-gradient(to right, transparent, #e2e8f0 50%, transparent)',
     labels: [
-      { value: '−20 cm', position: '0%' },
-      { value: '0', position: '50%' },
-      { value: '+20 cm', position: '100%' },
+      { value: '10 cm', position: '0%' },
+      { value: '17 fat', position: '50%' },
+      { value: '0 thin', position: '100%' },
     ],
   },
   {
@@ -297,8 +297,13 @@ function withSstRange(def: LegendDef, minF: number, maxF: number): LegendDef {
   return { ...def, labels: sstLegendLabels(minF, maxF) }
 }
 
+function withSshStamp(def: LegendDef, sshStamp: string | null): LegendDef {
+  if (def.layerId !== 'altimetry' || !sshStamp) return def
+  return { ...def, stamp: sshStamp }
+}
+
 export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forecastBarOpen?: boolean; hidden?: boolean }) {
-  const { layers, sstRange } = useMapStore()
+  const { layers, sstRange, sshStamp } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
   const activeLegends = LEGENDS.filter((def) => {
@@ -306,7 +311,7 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
     return layers.find((l) => l.id === def.layerId)?.visible
-  }).map((def) => withSstRange(def, sstRange.minF, sstRange.maxF))
+  }).map((def) => withSshStamp(withSstRange(def, sstRange.minF, sstRange.maxF), sshStamp))
 
   if (hidden || !activeLegends.length) return null
 
@@ -347,7 +352,7 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
 
 /** Compact legend pinned inside the right rail (Windy-class, not a map HUD). */
 export function PinnedLegend() {
-  const { layers, sstRange } = useMapStore()
+  const { layers, sstRange, sshStamp } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
   const activeLegends = LEGENDS.filter((def) => {
@@ -355,7 +360,7 @@ export function PinnedLegend() {
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
     return layers.find((l) => l.id === def.layerId)?.visible
-  }).map((def) => withSstRange(def, sstRange.minF, sstRange.maxF))
+  }).map((def) => withSshStamp(withSstRange(def, sstRange.minF, sstRange.maxF), sshStamp))
 
   if (!activeLegends.length) return null
 
