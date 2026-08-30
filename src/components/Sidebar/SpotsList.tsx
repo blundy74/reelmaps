@@ -189,13 +189,13 @@ export default function SpotsList() {
         </div>
 
         {/* Type filter pills */}
-        <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex flex-wrap gap-1.5 pb-1">
           {SPOT_TYPES.map((t) => (
             <button
               key={t.value}
               onClick={() => setTypeFilter(t.value)}
               className={cn(
-                'flex-shrink-0 text-xs px-2.5 py-1 rounded-full border transition-all whitespace-nowrap',
+                'text-xs px-2.5 py-1 rounded-full border transition-all whitespace-nowrap',
                 typeFilter === t.value
                   ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
                   : 'bg-ocean-800 border-ocean-600 text-slate-500 hover:border-ocean-500 hover:text-slate-400',
@@ -242,6 +242,7 @@ export default function SpotsList() {
                 const selecting = selectedSpot?.id !== spot.id
                 setSelectedSpot(selecting ? spot : null)
                 if (selecting) {
+                  useMapStore.getState().setLayerVisible('fishing-spots', true)
                   useMapStore.getState().setFlyToTarget({ lat: spot.lat, lng: spot.lng, zoom: 10 })
                 }
               }}

@@ -3,7 +3,7 @@
  * GIBS OSCAR U/V, LOD by zoom, land-clipped. No Open-Meteo.
  */
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import type maplibregl from 'maplibre-gl'
 import { paintLandMask } from '../../lib/landMask'
 import {
@@ -109,6 +109,8 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const setLayerLoading = useMapStore((s) => s.setLayerLoading)
+  const [harborHint, setHarborHint] = useState(false)
+  const harborHintRef = useRef(false)
 
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current
@@ -135,7 +137,7 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     mask.height = Math.max(1, Math.round(ch))
     const mctx = mask.getContext('2d')
     if (!mctx) return
-    await paintLandMask(mctx, map, { inflatePx: 2 })
+    await paintLandMask(mctx, map, { inflatePx: 4 })
     landMaskRef.current = mctx.getImageData(0, 0, mask.width, mask.height)
   }, [mapRef])
 
@@ -158,8 +160,13 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     const ch = canvas.height / (window.devicePixelRatio || 1)
     ctx.clearRect(0, 0, cw, ch)
     if (!visible || !grid) return
+    // Do not paint a regular grid on land while the mask is still building.
+    if (!landMaskRef.current) return
 
-    const spacing = oscarLod(map.getZoom()).spacingPx
+    const zoom = map.getZoom()
+    const spacing = oscarLod(zoom).spacingPx
+    const samples: { sx: number; sy: number; angleDeg: number; length: number; slack: boolean }[] = []
+    let flowing = 0
     ctx.globalAlpha = opacity
     for (let sy = spacing / 2; sy < ch; sy += spacing) {
       for (let sx = spacing / 2; sx < cw; sx += spacing) {
@@ -168,9 +175,21 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
         const sample = sampleOscar(grid, ll.lat, ll.lng)
         if (!sample) continue
         const slack = sample.speedKt < OSCAR_SLACK_KT
+        if (!slack) flowing++
         const t = Math.min(sample.speedKt / OSCAR_SPEED_MAX_KT, 1)
         const len = ARROW_LENGTH_MIN + t * (ARROW_LENGTH_MAX - ARROW_LENGTH_MIN)
-        drawArrow(ctx, sx, sy, sample.angleDeg, len, slack)
+        samples.push({ sx, sy, angleDeg: sample.angleDeg, length: len, slack })
+      }
+    }
+    // Harbor / high zoom: OSCAR is ~0.25° — a slack tick grid is fake.
+    const sparse = zoom >= 8.5 && flowing === 0
+    if (sparse !== harborHintRef.current) {
+      harborHintRef.current = sparse
+      setHarborHint(sparse)
+    }
+    if (!sparse) {
+      for (const s of samples) {
+        drawArrow(ctx, s.sx, s.sy, s.angleDeg, s.length, s.slack)
       }
     }
     ctx.globalAlpha = 1
@@ -233,7 +252,15 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
       void rebuildLandMask().then(render)
       scheduleFetch()
     }
-    const onMove = () => { render() }
+    let moveRaf = 0
+    const onMove = () => {
+      if (moveRaf) return
+      moveRaf = requestAnimationFrame(() => {
+        moveRaf = 0
+        landMaskRef.current = null
+        void rebuildLandMask().then(render)
+      })
+    }
     const onMoveEnd = () => {
       landMaskRef.current = null
       void rebuildLandMask().then(render)
@@ -268,16 +295,27 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
         const ch = canvasRef.current.height / (window.devicePixelRatio || 1)
         ctx.clearRect(0, 0, cw, ch)
       }
+      if (harborHintRef.current) {
+        harborHintRef.current = false
+        setHarborHint(false)
+      }
       return
     }
     render()
   }, [visible, opacity, render])
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 15 }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 15 }}
+      />
+      {visible && harborHint && (
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none px-2.5 py-1 rounded-md bg-black/65 border border-white/15 text-[11px] text-slate-200">
+          Zoom out for currents
+        </div>
+      )}
+    </>
   )
 }

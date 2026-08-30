@@ -4,7 +4,7 @@
  * Run: npx --yes vite-node src/lib/oceanographyLayers.test.ts
  */
 import { LAYER_REGISTRY } from './layerUrls'
-import { SSH_FAT_M } from './sshContours'
+import { SSH_FAT_M, SSH_FAT_WIDTH, SSH_HAIRLINE_WIDTH } from './sshContours'
 import { OSCAR_AGE_STAMP, OSCAR_SLACK_KT } from './oscarCurrents'
 
 function assert(cond: unknown, msg: string): asserts cond {
@@ -35,6 +35,9 @@ function main() {
 
   // Locks from prior UA work — this PR must not retouch them.
   assert(SSH_FAT_M === 0, 'fat contour stays SLA 0')
+  assert(SSH_FAT_WIDTH >= 3, `fat-0 must be bolder than hairlines (${SSH_FAT_WIDTH})`)
+  assert(SSH_HAIRLINE_WIDTH <= 0.55, 'hairlines stay quiet so SST stays readable')
+  assert(SSH_FAT_WIDTH > SSH_HAIRLINE_WIDTH * 4, 'fat-0 at least 4× hairline')
   assert(OSCAR_AGE_STAMP === 'OSCAR 17 Jul 2024', `OSCAR stamp ${OSCAR_AGE_STAMP}`)
   assert(OSCAR_SLACK_KT === 0.45, 'slack heads-only threshold unchanged')
   assert(byId['sst-mur'].name === 'Sea Surface Temp', 'SST row is Sea Surface Temp')

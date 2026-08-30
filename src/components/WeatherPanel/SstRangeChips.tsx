@@ -23,11 +23,13 @@ function Chip({
   active,
   disabled,
   children,
+  subtitle,
   onClick,
 }: {
   active: boolean
   disabled?: boolean
   children: ReactNode
+  subtitle?: string
   onClick: () => void
 }) {
   return (
@@ -36,14 +38,17 @@ function Chip({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'px-2 py-1 rounded-full text-[10px] font-medium border transition-colors',
+        'px-2 py-1 rounded-full text-[10px] font-medium border transition-colors leading-tight',
         active
           ? 'bg-cyan-500/20 border-cyan-400/45 text-cyan-200'
           : 'bg-black/25 border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300',
         disabled && 'opacity-50 cursor-wait',
       )}
     >
-      {children}
+      <span className="block">{children}</span>
+      {subtitle != null && subtitle !== '' && (
+        <span className="block text-[8px] font-normal opacity-80 leading-none mt-0.5">{subtitle}</span>
+      )}
     </button>
   )
 }
@@ -80,12 +85,11 @@ export default function SstRangeChips() {
 
   const fitIsPlaceholder =
     sstRange.minF === SST_WIDE_MIN_F && sstRange.maxF === SST_WIDE_MAX_F
-  const fitLabel =
-    sstRange.preset === 'fit' && !fitIsPlaceholder
-      ? `Fit ${sstRange.minF}–${sstRange.maxF}`
-      : fitting
-        ? 'Fitting…'
-        : 'Fit to view'
+  const fitSubtitle = fitting
+    ? 'sampling…'
+    : sstRange.preset === 'fit' && !fitIsPlaceholder
+      ? `${sstRange.minF}–${sstRange.maxF}°F`
+      : 'to view'
 
   return (
     <section>
@@ -96,9 +100,10 @@ export default function SstRangeChips() {
         <Chip
           active={sstRange.preset === 'fit'}
           disabled={fitting || !mapBounds}
+          subtitle={fitSubtitle}
           onClick={() => { void handleFitChip() }}
         >
-          {fitLabel}
+          Fit
         </Chip>
         <Chip
           active={sstRange.preset === 'gom'}

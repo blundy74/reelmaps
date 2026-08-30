@@ -9,6 +9,7 @@ import { useMapStore } from '../../store/mapStore'
 import { SPOT_ICONS, getSpotIcon } from '../../lib/spotIcons'
 import type { SavedSpot } from '../../lib/apiClient'
 import { cn } from '../../lib/utils'
+import { displaySpotName } from '../../lib/spotDisplay'
 
 // ── Edit Modal ──────────────────────────────────────────────────────────────
 
@@ -213,7 +214,7 @@ function SpotRow({ spot, onEdit, selectMode, selected, onToggleSelect }: {
           className="flex-1 min-w-0 cursor-pointer"
           onClick={() => selectMode ? onToggleSelect(spot.id) : setFlyToTarget({ lat: spot.lat, lng: spot.lng, zoom: 12 })}
         >
-          <h4 className="text-sm font-medium text-slate-200 leading-tight truncate">{spot.name}</h4>
+          <h4 className="text-sm font-medium text-slate-200 leading-tight truncate">{displaySpotName(spot.name)}</h4>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs font-mono text-slate-500">
               {Math.abs(spot.lat).toFixed(4)}{'\u00B0'}{spot.lat >= 0 ? 'N' : 'S'}{' '}

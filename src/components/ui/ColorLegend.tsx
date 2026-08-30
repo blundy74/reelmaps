@@ -1,6 +1,6 @@
 import { useMapStore } from '../../store/mapStore'
 import { useWeatherStore } from '../../store/weatherStore'
-import { SST_GRADIENT_CSS, sstLegendLabels } from '../../lib/sstPalette'
+import { SST_GRADIENT_CSS, sstLegendGradient, sstLegendLabels } from '../../lib/sstPalette'
 import { OSCAR_AGE_STAMP } from '../../lib/oscarCurrents'
 
 interface LegendDef {
@@ -294,7 +294,7 @@ export const LEGENDS: LegendDef[] = [
 
 function withSstRange(def: LegendDef, minF: number, maxF: number): LegendDef {
   if (def.layerId !== 'sst-mur' && def.layerId !== 'sst-goes') return def
-  return { ...def, labels: sstLegendLabels(minF, maxF) }
+  return { ...def, labels: sstLegendLabels(minF, maxF), gradient: sstLegendGradient(minF, maxF) }
 }
 
 function withSshStamp(def: LegendDef, sshStamp: string | null): LegendDef {
@@ -303,13 +303,14 @@ function withSshStamp(def: LegendDef, sshStamp: string | null): LegendDef {
 }
 
 export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forecastBarOpen?: boolean; hidden?: boolean }) {
-  const { layers, sstRange, sshStamp } = useMapStore()
+  const { layers, sstRange, sshStamp, sstEmpty } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
   const activeLegends = LEGENDS.filter((def) => {
     if (def.isWeatherOverlay) {
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
+    if ((def.layerId === 'sst-mur' || def.layerId === 'sst-goes') && sstEmpty) return false
     return layers.find((l) => l.id === def.layerId)?.visible
   }).map((def) => withSshStamp(withSstRange(def, sstRange.minF, sstRange.maxF), sshStamp))
 
@@ -352,13 +353,14 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
 
 /** Compact legend pinned inside the right rail (Windy-class, not a map HUD). */
 export function PinnedLegend() {
-  const { layers, sstRange, sshStamp } = useMapStore()
+  const { layers, sstRange, sshStamp, sstEmpty } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
   const activeLegends = LEGENDS.filter((def) => {
     if (def.isWeatherOverlay) {
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
+    if ((def.layerId === 'sst-mur' || def.layerId === 'sst-goes') && sstEmpty) return false
     return layers.find((l) => l.id === def.layerId)?.visible
   }).map((def) => withSshStamp(withSstRange(def, sstRange.minF, sstRange.maxF), sshStamp))
 
