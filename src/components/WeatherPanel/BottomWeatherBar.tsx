@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useWeatherStore } from '../../store/weatherStore'
 import { useMapStore } from '../../store/mapStore'
-import { degreesToCardinal, getWeatherIcon } from '../../lib/weatherTypes'
+import { degreesToCardinal, getWeatherIcon, mphToKnots } from '../../lib/weatherTypes'
 import { cn } from '../../lib/utils'
 
 export default function BottomWeatherBar() {
@@ -24,6 +24,7 @@ export default function BottomWeatherBar() {
 
   const droppedPin = useMapStore((s) => s.droppedPin)
   const clickedPoint = useMapStore((s) => s.clickedPoint)
+  const viewState = useMapStore((s) => s.viewState)
 
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -138,6 +139,12 @@ export default function BottomWeatherBar() {
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-30 bg-ocean-900/95 backdrop-blur-md border-t border-ocean-700">
+      <div className="px-4 pt-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+        Weather playback
+        <span className="ml-2 font-normal normal-case tracking-normal text-slate-600">
+          forecast and radar — SST date stays put
+        </span>
+      </div>
       <div className="flex items-center gap-3 px-4 py-2">
         <button
           onClick={togglePlay}
@@ -172,18 +179,16 @@ export default function BottomWeatherBar() {
             <svg width="8" height="8" viewBox="0 0 10 10" style={{ transform: `rotate(${selected.windDirection + 180}deg)` }}>
               <polygon points="5,0 3,8 5,6 7,8" fill="#22d3ee" />
             </svg>
-            <span className="font-mono">{Math.round(selected.windSpeed)} mph {degreesToCardinal(selected.windDirection)}</span>
+            <span className="font-mono">{Math.round(mphToKnots(selected.windSpeed))} kt {degreesToCardinal(selected.windDirection)}</span>
           </div>
           {selected.precipProbability > 0 && (
             <span className="text-blue-300 font-mono">{selected.precipProbability}% rain</span>
           )}
         </div>
 
-        {location && (
-          <div className="ml-auto text-xs text-slate-500 flex-shrink-0 hidden sm:block">
-            {Math.abs(location.lat).toFixed(2)}°{location.lat >= 0 ? 'N' : 'S'}, {Math.abs(location.lng).toFixed(2)}°{location.lng >= 0 ? 'E' : 'W'}
-          </div>
-        )}
+        <div className="ml-auto text-xs text-slate-500 flex-shrink-0 hidden sm:block">
+          {Math.abs(viewState.latitude).toFixed(2)}°{viewState.latitude >= 0 ? 'N' : 'S'}, {Math.abs(viewState.longitude).toFixed(2)}°{viewState.longitude >= 0 ? 'E' : 'W'}
+        </div>
       </div>
 
       <div className="overflow-x-auto px-4 pb-2" ref={scrollRef}>
@@ -215,8 +220,6 @@ export default function BottomWeatherBar() {
                   'relative flex flex-col items-center gap-0 px-1 py-1 rounded min-w-[42px] text-center overflow-hidden',
                   isSelected
                     ? 'bg-cyan-400 text-ocean-950 border-2 border-white shadow-[0_0_12px_rgba(34,211,238,0.65)] scale-105 z-[1]'
-                    : isNowHour
-                    ? 'bg-red-500/20 border-2 border-red-500 text-slate-100'
                     : isMidnight
                     ? 'bg-ocean-800/80 hover:bg-ocean-700/60 border border-transparent'
                     : isPast
@@ -238,16 +241,15 @@ export default function BottomWeatherBar() {
                     style={{ left: '0%' }}
                   />
                 )}
-                {isNowHour && !isSelected && (
-                  <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-red-500 z-10" />
-                )}
                 <span className={cn(
                   'relative z-[1] text-[9px] font-semibold',
-                  isSelected ? 'text-ocean-950' : isNowHour ? 'text-red-400' : 'text-slate-400',
+                  isSelected ? 'text-ocean-950' : 'text-slate-400',
                 )}>
-                  {isNowHour ? 'Now' : isMidnight
-                    ? date.toLocaleDateString('en-US', { weekday: 'short' })
-                    : date.toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', '')}
+                  {isSelected && isNowHour
+                    ? 'Now'
+                    : isMidnight
+                      ? date.toLocaleDateString('en-US', { weekday: 'short' })
+                      : date.toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', '')}
                 </span>
                 <span className="relative z-[1] text-xs">{hIcon}</span>
                 <span className={cn(
@@ -259,7 +261,7 @@ export default function BottomWeatherBar() {
                     <polygon points="5,0 3,8 5,6 7,8" fill={isSelected ? '#083344' : '#94a3b8'} />
                   </svg>
                   <span className={cn('text-[9px] font-mono', isSelected ? 'text-ocean-950' : 'text-slate-400')}>
-                    {Math.round(h.windSpeed)}
+                    {Math.round(mphToKnots(h.windSpeed))}
                   </span>
                 </div>
                 {h.precipProbability > 0 && (
@@ -275,7 +277,7 @@ export default function BottomWeatherBar() {
       </div>
 
       <div className="hidden sm:flex items-center justify-center gap-0.5 px-4 pb-1.5">
-        <span className="text-[10px] text-slate-500 mr-1">mph</span>
+        <span className="text-[10px] text-slate-500 mr-1">kt</span>
         {[
           { color: '#1e3c8e', label: '0' },
           { color: '#0097a7', label: '5' },

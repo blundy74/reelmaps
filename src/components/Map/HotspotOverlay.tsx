@@ -20,6 +20,40 @@ function toDateKey(isoDate: string): string {
   return isoDate.replace(/-/g, '')
 }
 
+function lngLatToTile(lng: number, lat: number, z: number): { x: number; y: number } {
+  const n = 2 ** z
+  const x = Math.floor(((lng + 180) / 360) * n)
+  const latRad = (lat * Math.PI) / 180
+  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n)
+  return { x, y }
+}
+
+async function hotspotTileHasInk(url: string, signal?: AbortSignal): Promise<boolean | null> {
+  try {
+    const res = await fetch(url, { signal })
+    if (res.status === 404 || res.status === 204) return false
+    if (!res.ok) return null
+    const blob = await res.blob()
+    if (blob.size < 80) return false
+    const img = await createImageBitmap(blob)
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(img, 0, 0)
+    const data = ctx.getImageData(0, 0, img.width, img.height).data
+    let ink = 0
+    for (let i = 3; i < data.length; i += 32) {
+      if (data[i] > 24) ink++
+    }
+    img.close()
+    return ink > 6
+  } catch {
+    return null
+  }
+}
+
 function addHotspotLayer(map: maplibregl.Map, srcId: string, lyrId: string, variantPath: string, dateKey: string, op: number) {
   const tileUrl = `${TILE_BASE}/tiles/${variantPath}/${dateKey}/{z}/{x}/{y}.png`
 
@@ -116,18 +150,47 @@ export default function HotspotOverlay({ mapRef, variant = 'hotspot', mapReady }
     const onError = (e: { sourceId?: string }) => {
       if (variant === 'hotspot' && e.sourceId === sourceId) setHotspotEmpty(true)
     }
-    const onSourceData = (e: { sourceId?: string; isSourceLoaded?: boolean }) => {
-      if (variant === 'hotspot' && e.sourceId === sourceId && e.isSourceLoaded) {
-        setHotspotEmpty(false)
-      }
-    }
     map.on('error', onError)
-    map.on('sourcedata', onSourceData)
+
+    let probeAbort: AbortController | null = null
+    const probeEmpty = () => {
+      if (variant !== 'hotspot' || !visible) return
+      probeAbort?.abort()
+      const controller = new AbortController()
+      probeAbort = controller
+      const z = Math.min(8, Math.max(0, Math.floor(map.getZoom())))
+      const c = map.getCenter()
+      const dateKey = toDateKey(selectedDate)
+      const tiles = [
+        lngLatToTile(c.lng, c.lat, z),
+        lngLatToTile(c.lng + 0.4, c.lat, z),
+        lngLatToTile(c.lng - 0.4, c.lat, z),
+      ]
+      void (async () => {
+        const results = await Promise.all(
+          tiles.map(({ x, y }) =>
+            hotspotTileHasInk(`${TILE_BASE}/tiles/${variant}/${dateKey}/${z}/${x}/${y}.png`, controller.signal),
+          ),
+        )
+        if (controller.signal.aborted) return
+        if (results.some((r) => r === true)) {
+          setHotspotEmpty(false)
+          return
+        }
+        if (results.every((r) => r === false)) setHotspotEmpty(true)
+      })()
+    }
+
+    if (visible && variant === 'hotspot') {
+      map.once('idle', probeEmpty)
+      map.on('moveend', probeEmpty)
+    }
 
     return () => {
       map.off('style.load', onStyleLoad)
       map.off('error', onError)
-      map.off('sourcedata', onSourceData)
+      map.off('moveend', probeEmpty)
+      probeAbort?.abort()
     }
   }, [mapRef, visible, opacity, selectedDate, sourceId, layerId, variant, mapReady, setHotspotEmpty])
 

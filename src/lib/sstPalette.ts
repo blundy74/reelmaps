@@ -47,7 +47,7 @@ export function activeSstLayerId(
   return null
 }
 
-/** Same rainbow the map HUD already documented — now actually used for coloring. */
+/** Continuous rainbow — used only as a fallback lerp. Map paint uses FISHING_BANDS. */
 export const SST_RAMP: [number, number, number][] = [
   [5, 0, 128],
   [0, 0, 255],
@@ -61,8 +61,29 @@ export const SST_RAMP: [number, number, number][] = [
   [128, 0, 0],
 ]
 
+/**
+ * Discrete fishing SST bands — each step is a different ink so 1°F rips read.
+ * Index 0 = cold extension, 1–10 = in-range blue→red, 11–12 = hot extension
+ * (late-summer 87–88 when the lock is 78–86).
+ */
+export const FISHING_BANDS: [number, number, number][] = [
+  [8, 0, 96],
+  [0, 20, 200],
+  [0, 110, 255],
+  [0, 210, 255],
+  [0, 255, 170],
+  [50, 220, 0],
+  [200, 255, 0],
+  [255, 200, 0],
+  [255, 120, 0],
+  [255, 40, 0],
+  [220, 0, 30],
+  [180, 0, 120],
+  [255, 80, 180],
+]
+
 export const SST_GRADIENT_CSS =
-  'linear-gradient(to right, #050080, #0000ff, #00b0ff, #00ffff, #00ff80, #80ff00, #ffff00, #ff8000, #ff0000, #800000)'
+  'linear-gradient(to right, #0014c8, #006eff, #00d2ff, #00ffaa, #32dc00, #c8ff00, #ffc800, #ff7800, #ff2800, #dc001e)'
 
 const packedToC = new Map<number, number>()
 for (const e of GIBS_SST_ENTRIES) {
@@ -125,6 +146,63 @@ export function rampColor(t: number): { r: number; g: number; b: number } {
   }
 }
 
+/** 0.5°F ticks on a tight Fit; 1°F ticks on Loop/sail and Wide. */
+export function fishingBandStep(minF: number, maxF: number): number {
+  const span = Math.max(maxF - minF, 0.5)
+  return span <= 3 ? 0.5 : 1
+}
+
+export function fishingInRangeBands(minF: number, maxF: number): number {
+  const step = fishingBandStep(minF, maxF)
+  return Math.max(2, Math.round((maxF - minF) / step) + 1)
+}
+
+/**
+ * Solid fishing-chart color for one °F. Adjacent 1°F (or 0.5°F) ticks
+ * get different ink. Values just above the lock stay distinct so a
+ * late-August 78–86 chip does not crush 86 / 87 / 88 into one red slab.
+ */
+export function fishingBandColor(
+  tF: number,
+  minF: number,
+  maxF: number,
+): { r: number; g: number; b: number } {
+  const step = fishingBandStep(minF, maxF)
+  const nIn = fishingInRangeBands(minF, maxF)
+  let i: number
+  if (tF < minF) {
+    i = 0
+  } else if (tF > maxF) {
+    const above = Math.max(0, Math.floor((tF - maxF) / step - 1e-9))
+    i = Math.min(FISHING_BANDS.length - 1, 11 + above)
+  } else {
+    const band = Math.min(nIn - 1, Math.max(0, Math.floor((tF - minF) / step + 1e-9)))
+    i = nIn === 1 ? 10 : 1 + Math.round((band * 9) / (nIn - 1))
+  }
+  const c = FISHING_BANDS[Math.max(0, Math.min(FISHING_BANDS.length - 1, i))]
+  return { r: c[0], g: c[1], b: c[2] }
+}
+
+function rgbHex(c: { r: number; g: number; b: number }): string {
+  const h = (n: number) => n.toString(16).padStart(2, '0')
+  return `#${h(c.r)}${h(c.g)}${h(c.b)}`
+}
+
+/** Stepped legend that matches the map (not a smooth smear). */
+export function sstLegendGradient(minF: number, maxF: number): string {
+  const step = fishingBandStep(minF, maxF)
+  const nIn = fishingInRangeBands(minF, maxF)
+  const parts: string[] = []
+  for (let b = 0; b < nIn; b++) {
+    const c = fishingBandColor(minF + b * step, minF, maxF)
+    const hex = rgbHex(c)
+    const pct0 = (b / nIn) * 100
+    const pct1 = ((b + 1) / nIn) * 100
+    parts.push(`${hex} ${pct0.toFixed(1)}%`, `${hex} ${pct1.toFixed(1)}%`)
+  }
+  return `linear-gradient(to right, ${parts.join(', ')})`
+}
+
 /** Recolor one GIBS SST pixel into the captain-chosen °F domain. */
 export function recolorSstPixel(
   r: number,
@@ -137,23 +215,22 @@ export function recolorSstPixel(
   const tC = rgbToCelsius(r, g, b, a)
   if (tC === null) return { r: 0, g: 0, b: 0, a: 0 }
   const tF = celsiusToFahrenheit(tC)
-  const span = Math.max(maxF - minF, 0.01)
-  const t = (tF - minF) / span
-  const c = rampColor(t)
+  const c = fishingBandColor(tF, minF, maxF)
   return { r: c.r, g: c.g, b: c.b, a: 230 }
 }
 
+/** `b` token = discrete fishing bands — busts MapLibre tile cache on palette change. */
 export function applySstScaleUrl(url: string, minF: number, maxF: number): string {
   const a = Number(minF.toFixed(1))
   const b = Number(maxF.toFixed(1))
   if (url.startsWith('https://')) {
-    return url.replace('https://', `sstscale://${a},${b}/`)
+    return url.replace('https://', `sstscale://${a},${b},b/`)
   }
   return url
 }
 
 export function parseSstScaleUrl(url: string): { minF: number; maxF: number; httpsUrl: string } | null {
-  const m = url.match(/^sstscale:\/\/(-?[\d.]+),(-?[\d.]+)\/(.+)$/)
+  const m = url.match(/^sstscale:\/\/(-?[\d.]+),(-?[\d.]+)(?:,[a-z0-9]+)?\/(.+)$/)
   if (!m) return null
   return {
     minF: parseFloat(m[1]),
@@ -285,4 +362,63 @@ export function sstLegendLabels(minF: number, maxF: number): { value: string; po
     { value: fmt(mid), position: '50%' },
     { value: fmt(maxF), position: '100%' },
   ]
+}
+
+/** Sample SST °F at one lon/lat. Null when the layer is off-product or the pixel is nodata. */
+export async function sampleSstAtPoint(
+  layerId: string,
+  date: string,
+  lat: number,
+  lng: number,
+  signal?: AbortSignal,
+): Promise<number | null> {
+  const layer = SST_GIBS_LAYER[layerId]
+  if (!layer) return null
+  const pad = 0.02
+  const bounds = {
+    west: lng - pad,
+    south: lat - pad,
+    east: lng + pad,
+    north: lat + pad,
+  }
+  const { xmin, ymin, xmax, ymax } = lngLatBoundsTo3857(bounds)
+  if (!(xmax > xmin) || !(ymax > ymin)) return null
+
+  const params = new URLSearchParams({
+    SERVICE: 'WMS',
+    VERSION: '1.3.0',
+    REQUEST: 'GetMap',
+    CRS: 'EPSG:3857',
+    WIDTH: '5',
+    HEIGHT: '5',
+    FORMAT: 'image/png',
+    TRANSPARENT: 'TRUE',
+    LAYERS: layer,
+    TIME: date,
+    BBOX: `${xmin},${ymin},${xmax},${ymax}`,
+  })
+
+  const res = await fetch(`${GIBS_WMS}?${params.toString()}`, { signal })
+  if (!res.ok) return null
+  const blob = await res.blob()
+  if (!blob.type.includes('png') && !blob.type.includes('octet-stream')) return null
+
+  const img = await createImageBitmap(blob)
+  const canvas = document.createElement('canvas')
+  canvas.width = img.width
+  canvas.height = img.height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.drawImage(img, 0, 0)
+  const data = ctx.getImageData(0, 0, img.width, img.height).data
+
+  const temps: number[] = []
+  for (let i = 0; i < data.length; i += 4) {
+    const tC = rgbToCelsius(data[i], data[i + 1], data[i + 2], data[i + 3])
+    if (tC === null) continue
+    temps.push(celsiusToFahrenheit(tC))
+  }
+  if (!temps.length) return null
+  temps.sort((a, b) => a - b)
+  return temps[Math.floor(temps.length / 2)]
 }

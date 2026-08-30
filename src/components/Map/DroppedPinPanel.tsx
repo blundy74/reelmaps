@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useMapStore } from '../../store/mapStore'
 import { useWeatherStore } from '../../store/weatherStore'
 import { useUserSpotsStore } from '../../store/userSpotsStore'
-import { WMO_CODES, degreesToCardinal, windToBeaufort, waveHeightToSeaState } from '../../lib/weatherTypes'
+import { WMO_CODES, degreesToCardinal, windToBeaufort, waveHeightToSeaState, mphToKnots } from '../../lib/weatherTypes'
 import {
   MISSING_DISPLAY,
   formatModelCurrentKt,
@@ -10,6 +10,7 @@ import {
   formatModelTempF,
   isUnavailableZero,
 } from '../../lib/marineDisplay'
+import { fetchDepthFeet, formatDepthFeet } from '../../lib/oceanDepth'
 
 /** Convert decimal degrees to degrees-minutes-seconds string */
 function toDMS(decimal: number, isLat: boolean): string {
@@ -66,22 +67,6 @@ function useActiveWeatherContext() {
   return { windActive, radarActive, sstActive, currentsActive, chlorophyllActive, salinityActive }
 }
 
-/** Fetch ocean depth (meters) from ETOPO 2022 via ERDDAP for a single point.
- *  Proxied through the tile Lambda to avoid CORS issues with ERDDAP. */
-const TILE_BASE = import.meta.env.VITE_HRRR_TILE_URL || 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com'
-
-async function fetchDepth(lat: number, lng: number): Promise<number | null> {
-  try {
-    const url = `${TILE_BASE}/tiles/depth?lat=${lat.toFixed(4)}&lng=${lng.toFixed(4)}`
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) }).catch(() => null)
-    if (!res || !res.ok) return null
-    const data = await res.json()
-    return data?.depth ?? null
-  } catch {
-    return null
-  }
-}
-
 export default function DroppedPinPanel() {
   const { droppedPin, setDroppedPin, setPinModeActive } = useMapStore()
   const { current, hourly, marine, fetchWeather, panelOpen, selectedForecastHour } = useWeatherStore()
@@ -96,13 +81,8 @@ export default function DroppedPinPanel() {
       fetchWeather(droppedPin.lat, droppedPin.lng)
       setDepthFt(null)
       setDepthLoading(true)
-      fetchDepth(droppedPin.lat, droppedPin.lng).then((alt) => {
-        if (alt != null && alt < 0) {
-          // Convert meters to feet (negative altitude = ocean depth)
-          setDepthFt(Math.round(Math.abs(alt) * 3.28084))
-        } else {
-          setDepthFt(null) // on land or no data
-        }
+      fetchDepthFeet(droppedPin.lat, droppedPin.lng).then((ft) => {
+        setDepthFt(ft)
         setDepthLoading(false)
       })
     }
@@ -153,7 +133,7 @@ export default function DroppedPinPanel() {
   const showGeneral = !showWind && !ctx.sstActive && !ctx.currentsActive
 
   return (
-    <div className="absolute top-14 left-3 right-3 md:left-auto md:right-14 z-20 animate-fade-in">
+    <div className="absolute top-14 left-14 right-auto z-20 animate-fade-in max-w-[calc(100vw-8rem)]">
       <div className="glass rounded-2xl shadow-2xl overflow-hidden overflow-y-auto w-full md:w-72 max-h-[calc(100vh-8rem)]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-ocean-700">
@@ -223,7 +203,7 @@ export default function DroppedPinPanel() {
               {depthLoading ? (
                 <div className="w-3 h-3 border border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
               ) : depthFt != null ? (
-                <span className="text-[10px] font-semibold text-cyan-300 font-mono">{depthFt.toLocaleString()}'</span>
+                <span className="text-[10px] font-semibold text-cyan-300 font-mono">{formatDepthFeet(depthFt)}</span>
               ) : (
                 <span className="text-[10px] text-slate-600">—</span>
               )}
@@ -241,10 +221,10 @@ export default function DroppedPinPanel() {
                 <svg width="12" height="12" viewBox="0 0 10 10" style={{ transform: `rotate(${effectiveCurrent.windDirection + 180}deg)` }}>
                   <polygon points="5,0 3,8 5,6 7,8" fill="#06b6d4" />
                 </svg>
-                <span className="text-xs font-semibold text-slate-200 font-mono">{Math.round(effectiveCurrent.windSpeed)}</span>
-                <span className="text-[10px] text-slate-500">mph</span>
+                <span className="text-xs font-semibold text-slate-200 font-mono">{Math.round(mphToKnots(effectiveCurrent.windSpeed))}</span>
+                <span className="text-[10px] text-slate-500">kt</span>
                 {effectiveCurrent.windGusts > effectiveCurrent.windSpeed + 5 && (
-                  <span className="text-[10px] text-amber-400 font-mono">G{Math.round(effectiveCurrent.windGusts)}</span>
+                  <span className="text-[10px] text-amber-400 font-mono">G{Math.round(mphToKnots(effectiveCurrent.windGusts))}</span>
                 )}
               </div>
             </div>
@@ -403,14 +383,14 @@ export default function DroppedPinPanel() {
                         <svg width="10" height="10" viewBox="0 0 10 10" style={{ transform: `rotate(${effectiveCurrent.windDirection + 180}deg)` }}>
                           <polygon points="5,0 3,8 5,6 7,8" fill="#06b6d4" />
                         </svg>
-                        <span className="text-xs font-semibold text-slate-200 font-mono">{Math.round(effectiveCurrent.windSpeed)} mph</span>
+                        <span className="text-xs font-semibold text-slate-200 font-mono">{Math.round(mphToKnots(effectiveCurrent.windSpeed))} kt</span>
                         <span className="text-[10px] text-slate-500">{degreesToCardinal(effectiveCurrent.windDirection)}</span>
                       </div>
                       {beaufort && <div className="text-[10px] text-slate-500">{beaufort.label}</div>}
                     </div>
                     <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
                       <div className="text-[9px] text-slate-500 uppercase">Gusts</div>
-                      <span className="text-xs font-semibold text-amber-400 font-mono">{Math.round(effectiveCurrent.windGusts)} mph</span>
+                      <span className="text-xs font-semibold text-amber-400 font-mono">{Math.round(mphToKnots(effectiveCurrent.windGusts))} kt</span>
                     </div>
                   </div>
                 )}

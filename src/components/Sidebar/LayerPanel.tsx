@@ -41,6 +41,16 @@ interface LayerRowProps {
   onOpacity: (id: string, v: number) => void
 }
 
+function HotspotEmptyHint() {
+  const empty = useMapStore((s) => s.hotspotEmpty)
+  if (!empty) return null
+  return (
+    <span className="block text-[10px] font-medium text-amber-300/90 leading-snug mt-0.5">
+      No hotspot tiles for this view/date
+    </span>
+  )
+}
+
 function SshRowStamp({ visible }: { visible: boolean }) {
   const stamp = useMapStore((s) => s.sshStamp)
   if (!stamp) return null
@@ -94,6 +104,9 @@ function LayerRow({ layer, onToggle, onOpacity }: LayerRowProps) {
           )}
           {layer.id === 'altimetry' && (
             <SshRowStamp visible={layer.visible} />
+          )}
+          {layer.id === 'hotspot' && layer.visible && (
+            <HotspotEmptyHint />
           )}
         </span>
         {layer.visible && loading && (
@@ -313,7 +326,7 @@ export default function LayerPanel() {
           )}
           {hotspotOn && hotspotEmpty && (
             <p className="text-[11px] text-amber-300/90 px-3 pt-1">
-              No hotspots for this date / view
+              No hotspot tiles for this view/date
             </p>
           )}
         </div>

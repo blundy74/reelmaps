@@ -17,10 +17,10 @@ export const SSH_CONTOUR_LEVELS = [
 ] as const
 
 const SSH_INK = 'rgba(226, 232, 240, 0.32)'
-const SSH_INK_HALO = 'rgba(15, 23, 42, 0.35)'
-const LINE_WIDTH = 0.45
-const FAT_WIDTH = 1.85
-const FAT_INK = 'rgba(226, 232, 240, 0.72)'
+const SSH_INK_HALO = 'rgba(15, 23, 42, 0.4)'
+export const SSH_HAIRLINE_WIDTH = 0.45
+export const SSH_FAT_WIDTH = 3.4
+const FAT_INK = 'rgba(248, 250, 252, 0.92)'
 
 export function decodeSshAnomaly(
   rgba: Uint8ClampedArray,
@@ -169,16 +169,16 @@ function paintLookLocked(
     })
 
   for (const level of SSH_CONTOUR_LEVELS) {
-    strokeSegs(ctx, mapSegs(level), SSH_INK, LINE_WIDTH)
+    strokeSegs(ctx, mapSegs(level), SSH_INK, SSH_HAIRLINE_WIDTH)
   }
 
   const fat = mapSegs(SSH_FAT_M)
   ctx.save()
   ctx.shadowColor = SSH_INK_HALO
-  ctx.shadowBlur = 1
-  strokeSegs(ctx, fat, FAT_INK, FAT_WIDTH)
+  ctx.shadowBlur = 2.4
+  strokeSegs(ctx, fat, FAT_INK, SSH_FAT_WIDTH)
   ctx.restore()
-  strokeSegs(ctx, fat, 'rgba(15, 23, 42, 0.45)', 0.7)
+  strokeSegs(ctx, fat, 'rgba(15, 23, 42, 0.55)', 1.15)
 }
 
 /** Isolated timing helper — decode + isolines, no canvas. */

@@ -29,6 +29,8 @@ import type { SavedSpot } from '../../lib/apiClient'
 import { registerSmoothProtocol } from '../../lib/smoothTileProtocol'
 import { registerContourProtocol } from '../../lib/contourTileProtocol'
 import { registerSstScaleProtocol } from '../../lib/sstScaleProtocol'
+import { activeSstLayerId, sampleSstAtPoint } from '../../lib/sstPalette'
+import { fetchDepthFeet, formatDepthFeet } from '../../lib/oceanDepth'
 import { useSstAutoFit } from '../../hooks/useSstAutoFit'
 import { useAuthStore } from '../../store/authStore'
 import {
@@ -107,6 +109,8 @@ export default function FishingMap() {
   const mapRef = useRef<maplibregl.Map | null>(null)
   const initializedRef = useRef(false)
   const popupRef = useRef<maplibregl.Popup | null>(null)
+  const skipSpotCloseRef = useRef(false)
+  const sstPopupRef = useRef<maplibregl.Popup | null>(null)
   const pinMarkerRef = useRef<maplibregl.Marker | null>(null)
   const [speciesPoint, setSpeciesPoint] = useState<{ lat: number; lng: number } | null>(null)
   // Incremented after initial style.load so overlay components re-run their effects
@@ -128,6 +132,8 @@ export default function FishingMap() {
     sstRange,
     setLayerLoading,
     sstEmpty,
+    hotspotEmpty,
+    selectedSpot,
   } = useMapStore()
   const sstTilesKeyRef = useRef<Record<string, string>>({})
   const homeAppliedRef = useRef(false)
@@ -815,6 +821,42 @@ export default function FishingMap() {
           popupRef.current = null
         }
         setSelectedSpot(null)
+
+        const store = useMapStore.getState()
+        const sstId = activeSstLayerId(store.layers)
+        if (sstPopupRef.current) {
+          sstPopupRef.current.remove()
+          sstPopupRef.current = null
+        }
+        if (!sstId || store.sstEmpty) return
+
+        const lat = e.lngLat.lat
+        const lng = e.lngLat.lng
+        const date = store.selectedDate
+        void (async () => {
+          const [tempF, depthFt] = await Promise.all([
+            sampleSstAtPoint(sstId, date, lat, lng),
+            fetchDepthFeet(lat, lng),
+          ])
+          if (tempF == null) return
+          const html = [
+            `<div style="padding:8px 28px 8px 10px;font:600 13px/1.3 Inter,system-ui,sans-serif;color:#e2e8f0">`,
+            `${tempF.toFixed(1)}°F`,
+            depthFt != null ? `<div style="font:500 10px/1.3 Inter,system-ui,sans-serif;color:#67e8f9;margin-top:3px">${formatDepthFeet(depthFt)}</div>` : '',
+            `</div>`,
+          ].join('')
+          const popup = new maplibregl.Popup({
+            closeButton: true,
+            closeOnClick: false,
+            maxWidth: '160px',
+            offset: 10,
+            className: 'sst-readout-popup',
+          })
+            .setLngLat([lng, lat])
+            .setHTML(html)
+            .addTo(map)
+          sstPopupRef.current = popup
+        })()
       }
     })
 
@@ -947,6 +989,7 @@ export default function FishingMap() {
 
     return () => {
       if (popupRef.current) popupRef.current.remove()
+      if (sstPopupRef.current) sstPopupRef.current.remove()
       if (pinMarkerRef.current) pinMarkerRef.current.remove()
       map.off('sourcedata', onSourceData)
       map.off('dataloading', onDataLoading)
@@ -1203,7 +1246,11 @@ export default function FishingMap() {
     spot: FishingSpot,
     lngLat: maplibregl.LngLat,
   ) => {
-    if (popupRef.current) popupRef.current.remove()
+    if (popupRef.current) {
+      skipSpotCloseRef.current = true
+      popupRef.current.remove()
+      skipSpotCloseRef.current = false
+    }
 
     const el = document.createElement('div')
     const root = createRoot(el)
@@ -1222,12 +1269,28 @@ export default function FishingMap() {
       .addTo(map)
 
     popup.on('close', () => {
-      setSelectedSpot(null)
       root.unmount()
+      if (skipSpotCloseRef.current) return
+      setSelectedSpot(null)
     })
 
     popupRef.current = popup
   }
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !selectedSpot) return
+    openSpotPopup(map, selectedSpot, new maplibregl.LngLat(selectedSpot.lng, selectedSpot.lat))
+    // openSpotPopup is stable enough for inspect-from-list
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSpot?.id, mapReady])
+
+  useEffect(() => {
+    if (sstEmpty || !activeSstLayerId(layers)) {
+      sstPopupRef.current?.remove()
+      sstPopupRef.current = null
+    }
+  }, [sstEmpty, layers])
 
   const user = useAuthStore((s) => s.user)
   const spotsFetched = useUserSpotsStore((s) => s.fetched)
@@ -1279,6 +1342,11 @@ export default function FishingMap() {
       {sstEmpty && getLayer('sst-goes')?.visible && !getLayer('sst-mur')?.visible && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-lg bg-black/70 border border-amber-400/40 text-amber-200 text-[12px] font-medium shadow-lg pointer-events-none">
           No SST for this date
+        </div>
+      )}
+      {hotspotEmpty && getLayer('hotspot')?.visible && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-lg bg-black/70 border border-amber-400/40 text-amber-200 text-[12px] font-medium shadow-lg pointer-events-none">
+          No hotspot tiles for this view/date
         </div>
       )}
       <RadarOverlay mapRef={mapRef} mapReady={mapReady} />

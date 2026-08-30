@@ -41,7 +41,7 @@ export default function ShareButton() {
     const ok = await copyText(window.location.href)
     if (!ok) return
     setCopied(true)
-    window.setTimeout(() => setCopied(false), 2200)
+    window.setTimeout(() => setCopied(false), 3200)
   }, [])
 
   return (

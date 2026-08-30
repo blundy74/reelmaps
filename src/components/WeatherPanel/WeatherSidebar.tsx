@@ -248,9 +248,12 @@ export default function WeatherSidebar({ open, onClose }: Props) {
                 : 'border-white/10 bg-black/20 text-slate-400 hover:border-white/20',
             )}
           >
-            <span>Playback timeline</span>
+            <span>Weather playback</span>
             <span className={panelOpen ? 'text-cyan-400' : 'text-slate-600'}>{panelOpen ? 'ON' : 'OFF'}</span>
           </button>
+          <p className="text-[8px] text-slate-500 text-center leading-snug">
+            Forecast and radar only. SST / satellite date does not play back.
+          </p>
           <p className="text-[8px] text-slate-600 text-center">Open-Meteo · RainViewer · NOAA · NASA GIBS</p>
         </div>
       </aside>
