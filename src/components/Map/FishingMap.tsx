@@ -842,7 +842,7 @@ export default function FishingMap() {
         const urlLayerSet = new Set(urlState.layers)
         for (const l of store.layers) {
           if (urlLayerSet.has(l.id) && !l.visible) store.toggleLayer(l.id)
-          else if (!urlLayerSet.has(l.id) && l.visible && l.id !== 'fishing-spots' && l.id !== 'sst-mur') store.toggleLayer(l.id)
+          else if (!urlLayerSet.has(l.id) && l.visible) store.toggleLayer(l.id)
         }
       }
     } else if (!urlState || isGenericHomeView({
