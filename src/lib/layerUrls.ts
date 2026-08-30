@@ -398,7 +398,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
   {
     id: 'altimetry',
     name: 'SSH Contours',
-    description: 'Sea-level-anomaly isolines at 10 cm. Fat line = 17 cm (Leben Loop / eddy core). Thin 0 is optional. One ink, lines only — not a fill.',
+    description: 'Sea-level-anomaly isolines at 10 cm. Fat line = 0 anomaly (FishTrack eddy wall). One ink, lines only — not a fill.',
     group: 'oceanography',
     sourceType: 'geojson',
     dateDependent: false,
@@ -418,7 +418,7 @@ export const LAYER_REGISTRY: LayerDef[] = [
   {
     id: 'ssh-anomaly',
     name: 'SSH Fill',
-    description: 'Unlisted — rainbow sea-surface-height fill. Prefer SSH Contours (17 cm Loop) on SST instead of a third heatmap.',
+    description: 'Unlisted — rainbow sea-surface-height fill. Prefer SSH Contours (fat 0 anomaly) on SST instead of a third heatmap.',
     group: 'oceanography',
     sourceType: 'raster-wms',
     dateDependent: false,

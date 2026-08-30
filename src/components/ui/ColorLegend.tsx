@@ -88,12 +88,12 @@ export const LEGENDS: LegendDef[] = [
   {
     layerId: 'altimetry',
     title: 'SSH contours',
-    unit: '17 cm Loop',
+    unit: 'fat 0 anomaly',
     gradient: 'linear-gradient(to right, transparent, #e2e8f0 50%, transparent)',
     labels: [
       { value: '10 cm', position: '0%' },
-      { value: '17 fat', position: '50%' },
-      { value: '0 thin', position: '100%' },
+      { value: '0 fat', position: '50%' },
+      { value: 'SLA', position: '100%' },
     ],
   },
   {

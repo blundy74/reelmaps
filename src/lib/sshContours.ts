@@ -1,14 +1,16 @@
 /**
  * SSH anomaly isolines — fishing chart, not a rainbow sketch.
- * One ink (light slate). 10 cm interval. Fat 17 cm (Leben Loop / eddy core).
- * Thin 0 optional. Lines only, no fill.
+ * NOAA nesdisSSH1day SLA. One ink (light slate). 10 cm interval.
+ * Fat 0 = FishTrack eddy wall. Leben 17 cm is ADT/Loop — not this field.
+ * Lines only, no fill.
  */
 
 import { lookupColorValue, sshLookup } from './gibsColormaps'
 
 export const SSH_INTERVAL_M = 0.10
-export const SSH_FAT_M = 0.17
-/** Regular 10 cm levels, ±80 cm. No ±5 cm. 0 is drawn separately (thin). */
+/** Fat/bold contour is SLA 0 only. Not Leben 17 cm (ADT/Loop proxy). */
+export const SSH_FAT_M = 0
+/** Regular 10 cm levels, ±80 cm. No ±5 cm. No 17 cm. 0 is fat, not in this set. */
 export const SSH_CONTOUR_LEVELS = [
   -0.80, -0.70, -0.60, -0.50, -0.40, -0.30, -0.20, -0.10,
   0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80,
@@ -16,9 +18,7 @@ export const SSH_CONTOUR_LEVELS = [
 
 const SSH_INK = 'rgba(226, 232, 240, 0.88)'
 const SSH_INK_HALO = 'rgba(15, 23, 42, 0.72)'
-const SSH_ZERO_INK = 'rgba(226, 232, 240, 0.40)'
 const LINE_WIDTH = 1.05
-const ZERO_WIDTH = 0.7
 const FAT_WIDTH = 3.15
 
 export function decodeSshAnomaly(
@@ -121,7 +121,7 @@ export interface SshGridDraw {
   rows: number
 }
 
-/** Pixel-space draw (GIBS fallback decode or tests). One ink, 10 cm, fat 17. */
+/** Pixel-space draw (GIBS fallback decode or tests). One ink, 10 cm, fat 0. */
 export function drawSshContours(
   ctx: CanvasRenderingContext2D,
   grid: Float32Array,
@@ -167,9 +167,6 @@ function paintLookLocked(
       return [a[0], a[1], b[0], b[1]]
     })
 
-  const zero = mapSegs(0)
-  strokeSegs(ctx, zero, SSH_ZERO_INK, ZERO_WIDTH)
-
   for (const level of SSH_CONTOUR_LEVELS) {
     strokeSegs(ctx, mapSegs(level), SSH_INK, LINE_WIDTH)
   }
@@ -196,7 +193,6 @@ export function measureSshContourWork(rgba: Uint8ClampedArray, w: number, h: num
   for (const level of SSH_CONTOUR_LEVELS) {
     segments += isolineSegments(grid, w, h, level).length
   }
-  segments += isolineSegments(grid, w, h, 0).length
   segments += isolineSegments(grid, w, h, SSH_FAT_M).length
   const t2 = performance.now()
   return { decodeMs: t1 - t0, isolineMs: t2 - t1, segments }
