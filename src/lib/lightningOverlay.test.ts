@@ -3,6 +3,7 @@
  * Run: npx --yes tsx src/lib/lightningOverlay.test.ts
  */
 import {
+  FISHING_MAP_SYNC_SPOT_IDS,
   GLM_DENSITY_LAYER,
   GLM_IMAGERY_BELOW_IDS,
   GLM_SPOT_LAYER_IDS,
@@ -13,6 +14,7 @@ import {
   LIGHTNING_HRRR_TITLE,
   chlorophyll7DaySubIds,
   glmFlashesFromApi,
+  glmImageryBeforeId,
   glmTileCacheBust,
   hasRealEarthWatermarkHeader,
   rgbaLooksLikeWatermark,
@@ -26,6 +28,7 @@ import {
   realEarthGlmFedUrl,
   realEarthGlmHttpsUrl,
   realEarthGlmProbeUrl,
+  restackAfterFishingMapSync,
   restackGlmAboveImagery,
   usesGibsGlm,
   usesIemGlmErrorTiles,
@@ -147,6 +150,49 @@ function main() {
   restackGlmAboveImagery(buriedMap)
   assert(buried.indexOf('sst-mur') < buried.indexOf(GLM_DENSITY_LAYER), 'idle restack unburies GLM')
   assert(buried.indexOf('clusters') > buried.indexOf(GLM_DENSITY_LAYER), 'clusters stay on top')
+
+  // UA 14 failure: sstRange change removes sst-mur and addLayer-without-beforeId
+  // puts it on top of GLM. Old syncLayers only moveLayer'd spots, so GLM stayed buried.
+  const ua14: string[] = ['sst-mur', GLM_DENSITY_LAYER, 'fishing-spots']
+  const ua14Map = {
+    getLayer: (id: string) => (ua14.includes(id) ? { id } : undefined),
+    moveLayer: (id: string) => {
+      const i = ua14.indexOf(id)
+      if (i < 0) return
+      ua14.splice(i, 1)
+      ua14.push(id)
+    },
+    removeLayer: (id: string) => {
+      const i = ua14.indexOf(id)
+      if (i >= 0) ua14.splice(i, 1)
+    },
+    addLayer: (layer: { id: string }, beforeId?: string) => {
+      const existing = ua14.indexOf(layer.id)
+      if (existing >= 0) ua14.splice(existing, 1)
+      if (beforeId) {
+        const at = ua14.indexOf(beforeId)
+        if (at >= 0) {
+          ua14.splice(at, 0, layer.id)
+          return
+        }
+      }
+      ua14.push(layer.id)
+    },
+  }
+  ua14Map.removeLayer('sst-mur')
+  ua14Map.addLayer({ id: 'sst-mur' }) // UA 14: no beforeId → SST on top
+  assert(ua14.indexOf('sst-mur') > ua14.indexOf(GLM_DENSITY_LAYER), 'UA 14 bury: SST above GLM')
+  restackAfterFishingMapSync(ua14Map)
+  assert(ua14.indexOf(GLM_DENSITY_LAYER) > ua14.indexOf('sst-mur'), 'sync restack: GLM above sst-mur')
+  assert(ua14.indexOf('fishing-spots') > ua14.indexOf(GLM_DENSITY_LAYER), 'sync restack: spots above GLM')
+
+  // New addLayer path: if GLM exists, imagery inserts below it.
+  assert(glmImageryBeforeId(ua14Map) === GLM_DENSITY_LAYER, 'beforeId is GLM when present')
+  ua14Map.removeLayer('sst-mur')
+  ua14Map.addLayer({ id: 'sst-mur' }, glmImageryBeforeId(ua14Map))
+  assert(ua14.indexOf('sst-mur') < ua14.indexOf(GLM_DENSITY_LAYER), 'addLayer beforeId keeps SST under GLM')
+  assert(glmImageryBeforeId({ getLayer: () => undefined }) === undefined, 'no beforeId when GLM absent')
+  assert(FISHING_MAP_SYNC_SPOT_IDS.includes('fishing-spots'), 'sync restack lifts fishing-spots')
 
   const g = globalThis as { window?: { location: { port: string } } }
   const prev = g.window

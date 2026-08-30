@@ -45,6 +45,7 @@ import CurrentArrowOverlay from './CurrentArrowOverlay'
 import CurrentSpeedScale from './CurrentSpeedScale'
 import SshContourOverlay from './SshContourOverlay'
 import { SPOT_ICONS, renderIconToImageData, getSpotIcon } from '../../lib/spotIcons'
+import { glmImageryBeforeId, restackAfterFishingMapSync } from '../../lib/lightningOverlay'
 
 // ── Layer z-order (lower = rendered first / underneath) ─────────────────────
 const LAYER_ORDER = [
@@ -180,6 +181,7 @@ export default function FishingMap() {
       }
 
       if (!map.getLayer(layerId)) {
+        // Insert under live GLM so SST / imagery rebuilds cannot bury FED.
         map.addLayer({
           id: layerId,
           type: 'raster',
@@ -190,7 +192,7 @@ export default function FishingMap() {
             // Bilinear interpolation smooths low-res oceanographic data
             ...(SMOOTH_LAYERS.has(layerId) ? { 'raster-resampling': 'linear' as const } : {}),
           },
-        })
+        }, glmImageryBeforeId(map))
       }
     },
     [setLayerLoading],
@@ -550,7 +552,7 @@ export default function FishingMap() {
                 type: 'raster',
                 source: subSrcId,
                 paint: { 'raster-opacity': perDayOpacity },
-              })
+              }, glmImageryBeforeId(map))
             } else {
               map.setLayoutProperty(subId, 'visibility', 'visible')
               map.setPaintProperty(subId, 'raster-opacity', perDayOpacity)
@@ -593,14 +595,8 @@ export default function FishingMap() {
         }
       }
 
-      // Always move fishing spots and user spots to the very top so they're never covered by overlays
-      const spotLayers = [
-        'clusters', 'cluster-count', 'fishing-spots', 'fishing-spots-rigs', 'fishing-spots-fads', 'fishing-spots-labels',
-        'user-clusters', 'user-cluster-count', 'user-spots', 'user-spots-labels',
-      ]
-      for (const id of spotLayers) {
-        if (map.getLayer(id)) map.moveLayer(id)
-      }
+      // Spots to the top, then GLM above imagery (SST rebuilds addLayer-to-top otherwise).
+      restackAfterFishingMapSync(map)
     },
     [getLayer, selectedDate, sstRange, sstEmpty, addRasterLayer, addFishingSpotsLayer],
   )
@@ -989,7 +985,7 @@ export default function FishingMap() {
             const subSrcId = `${subId}-source`
             if (!map.getSource(subSrcId)) {
               map.addSource(subSrcId, { type: 'raster', tiles: [dayUrls[d]], tileSize: 256 })
-              map.addLayer({ id: subId, type: 'raster', source: subSrcId, paint: { 'raster-opacity': perDayOpacity } })
+              map.addLayer({ id: subId, type: 'raster', source: subSrcId, paint: { 'raster-opacity': perDayOpacity } }, glmImageryBeforeId(map))
             }
           }
         } else if (RASTER_LAYERS.has(layerId)) {
