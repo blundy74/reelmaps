@@ -2,6 +2,7 @@ import { useMapStore } from '../../store/mapStore'
 import { useWeatherStore } from '../../store/weatherStore'
 import { SST_GRADIENT_CSS, sstLegendGradient, sstLegendLabels, sstPaintRange } from '../../lib/sstPalette'
 import { OSCAR_AGE_STAMP } from '../../lib/oscarCurrents'
+import { lightningLegend, type LightningProduct } from '../../lib/lightningOverlay'
 
 interface LegendDef {
   layerId: string
@@ -201,6 +202,20 @@ export const LEGENDS: LegendDef[] = [
       { value: '50+', position: '100%' },
     ],
   },
+  // ── Live lightning (GLM FED; HRRR title when fallback is active) ──────
+  {
+    layerId: 'lightning',
+    title: 'Lightning (GLM)',
+    unit: 'FED',
+    stamp: 'GOES-East · 5 min',
+    isWeatherOverlay: true,
+    gradient: 'linear-gradient(to right, transparent, #1d4ed8, #3b82f6, #93c5fd, #e0f2fe)',
+    labels: [
+      { value: 'None', position: '0%' },
+      { value: 'Sparse', position: '50%' },
+      { value: 'Dense', position: '100%' },
+    ],
+  },
   // ── HRRR weather overlays ──────────────────────────────────────────────
   {
     layerId: 'hrrr-wind',
@@ -302,11 +317,24 @@ function withSshStamp(def: LegendDef, sshStamp: string | null): LegendDef {
   return { ...def, stamp: sshStamp }
 }
 
+function withLightningProduct(def: LegendDef, product: LightningProduct): LegendDef {
+  if (def.layerId !== 'lightning') return def
+  const legend = lightningLegend(product)
+  return { ...def, title: legend.title, stamp: legend.stamp, unit: legend.unit }
+}
+
+function prioritizeLightning(defs: LegendDef[]): LegendDef[] {
+  const lightning = defs.find((d) => d.layerId === 'lightning')
+  if (!lightning) return defs
+  return [lightning, ...defs.filter((d) => d.layerId !== 'lightning')]
+}
+
 export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forecastBarOpen?: boolean; hidden?: boolean }) {
   const { layers, sstRange, sshStamp, sstEmpty, currentsZoomHint } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
+  const lightningProduct = useWeatherStore((s) => s.lightningProduct)
 
-  const activeLegends = LEGENDS.filter((def) => {
+  const activeLegends = prioritizeLightning(LEGENDS.filter((def) => {
     if (def.isWeatherOverlay) {
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
@@ -315,8 +343,8 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
     return layers.find((l) => l.id === def.layerId)?.visible
   }).map((def) => {
     const paint = sstPaintRange(sstRange)
-    return withSshStamp(withSstRange(def, paint.minF, paint.maxF), sshStamp)
-  })
+    return withLightningProduct(withSshStamp(withSstRange(def, paint.minF, paint.maxF), sshStamp), lightningProduct)
+  }))
 
   if (hidden || !activeLegends.length) return null
 
@@ -359,8 +387,9 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
 export function PinnedLegend() {
   const { layers, sstRange, sshStamp, sstEmpty, currentsZoomHint } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
+  const lightningProduct = useWeatherStore((s) => s.lightningProduct)
 
-  const activeLegends = LEGENDS.filter((def) => {
+  const activeLegends = prioritizeLightning(LEGENDS.filter((def) => {
     if (def.isWeatherOverlay) {
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
@@ -368,8 +397,8 @@ export function PinnedLegend() {
     return layers.find((l) => l.id === def.layerId)?.visible
   }).map((def) => {
     const paint = sstPaintRange(sstRange)
-    return withSshStamp(withSstRange(def, paint.minF, paint.maxF), sshStamp)
-  })
+    return withLightningProduct(withSshStamp(withSstRange(def, paint.minF, paint.maxF), sshStamp), lightningProduct)
+  }))
 
   if (!activeLegends.length) return null
 

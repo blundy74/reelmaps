@@ -8,7 +8,7 @@ function assert(cond: unknown, msg: string): asserts cond {
 }
 
 function main() {
-  assert(UA_BUILD === 'UA 12', `build mark ${UA_BUILD}`)
+  assert(UA_BUILD === 'UA 13', `build mark ${UA_BUILD}`)
   console.log('uaBuild.test.ts: ok')
 }
 

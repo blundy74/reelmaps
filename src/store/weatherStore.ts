@@ -9,6 +9,7 @@ import type {
 } from '../lib/weatherTypes'
 import { fetchForecast, fetchMarine } from '../lib/weatherApi'
 import type { UnitSystem } from '../lib/units'
+import type { LightningProduct } from '../lib/lightningOverlay'
 import { useMapStore } from './mapStore'
 
 export interface HomePort {
@@ -58,8 +59,12 @@ interface WeatherState {
   loading: boolean
   error: string | null
 
+  /** Live lightning chip product — GLM FED or HRRR fallback. Not persisted. */
+  lightningProduct: LightningProduct
+
   // Actions
   setPanelOpen: (open: boolean) => void
+  setLightningProduct: (product: LightningProduct) => void
   setTab: (tab: WeatherState['tab']) => void
   setHomePort: (port: HomePort | null) => void
   setDefaultOverlayOpacity: (opacity: number) => void
@@ -80,7 +85,7 @@ const DEFAULT_OVERLAYS: WeatherOverlayDef[] = [
   { id: 'hrrr-vis', name: 'Visibility (HRRR)', visible: false, opacity: 0.6 },
   { id: 'hrrr-lightning', name: 'Lightning Forecast (HRRR)', visible: false, opacity: 0.7 },
   { id: 'hrrr-cloud', name: 'Cloud Cover (HRRR)', visible: false, opacity: 0.5 },
-  { id: 'lightning', name: 'Lightning (Live)', visible: false, opacity: 1.0 },
+  { id: 'lightning', name: 'Lightning (GLM)', visible: false, opacity: 1.0 },
   { id: 'lightning-sound', name: 'Thunder Sound', visible: false, opacity: 1.0 },
   { id: 'cloud-cover', name: 'Cloud Cover (Legacy)', visible: false, opacity: 0.5 },
   { id: 'wind', name: 'Wind Animation', visible: false, opacity: 0.2 },
@@ -107,8 +112,10 @@ export const useWeatherStore = create<WeatherState>()(
       defaultOverlayOpacity: 0.7,
       loading: false,
       error: null,
+      lightningProduct: 'glm',
 
       setPanelOpen: (open) => set({ panelOpen: open }),
+      setLightningProduct: (product) => set({ lightningProduct: product }),
       setTab: (tab) => set({ tab }),
       setLocation: (loc) => set({ location: loc }),
       setRadarFrameIndex: (idx) => set({ radarFrameIndex: idx }),

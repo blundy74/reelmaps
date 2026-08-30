@@ -246,6 +246,11 @@ export function hrrrTileUrl(variable: string, runDate: string, runHour: string, 
   return `${HRRR_TILE_BASE}/tiles/hrrr/${variable}/${runDate}/${runHour}/fh${String(fh).padStart(2, '0')}/{z}/{x}/{y}.png`
 }
 
+/** Live GOES-East GLM flash-extent density (RealEarth XYZ). Cache-bust so 5-min FED stays live. */
+export function realEarthGlmFedTiles(cacheBust: number | string): string {
+  return `https://realearth.ssec.wisc.edu/tiles/GOESEastGLMFEDRadC/{z}/{x}/{y}.png?t=${cacheBust}`
+}
+
 /** Build a HRRR precipitation forecast tile URL (backward compat) */
 export function hrrrPrecipUrl(runDate: string, runHour: string, fh: number): string {
   return `${HRRR_TILE_BASE}/tiles/hrrr/${runDate}/${runHour}/fh${String(fh).padStart(2, '0')}/{z}/{x}/{y}.png`
