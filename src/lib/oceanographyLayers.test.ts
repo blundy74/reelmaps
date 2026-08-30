@@ -1,7 +1,7 @@
 /**
  * Oceanography panel rows: arrows + SSH contours default on;
  * zonal raster + SSH fill listed, default off. No Advanced nest.
- * Run: npx --yes tsx src/lib/oceanographyLayers.test.ts
+ * Run: npx --yes vite-node src/lib/oceanographyLayers.test.ts
  */
 import { LAYER_REGISTRY } from './layerUrls'
 import { SSH_FAT_M } from './sshContours'
