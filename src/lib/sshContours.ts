@@ -1,11 +1,25 @@
 /**
- * SSH anomaly isolines from a GIBS MEaSUREs tile.
- * Lines only — no fill. Fat 0 (zero-anomaly) contour is the fishing edge.
+ * SSH anomaly isolines — fishing chart, not a rainbow sketch.
+ * One ink (light slate). 10 cm interval. Fat 17 cm (Leben Loop / eddy core).
+ * Thin 0 optional. Lines only, no fill.
  */
 
 import { lookupColorValue, sshLookup } from './gibsColormaps'
 
-export const SSH_CONTOUR_LEVELS = [-0.30, -0.20, -0.10, -0.05, 0, 0.05, 0.10, 0.20, 0.30]
+export const SSH_INTERVAL_M = 0.10
+export const SSH_FAT_M = 0.17
+/** Regular 10 cm levels, ±80 cm. No ±5 cm. 0 is drawn separately (thin). */
+export const SSH_CONTOUR_LEVELS = [
+  -0.80, -0.70, -0.60, -0.50, -0.40, -0.30, -0.20, -0.10,
+  0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80,
+] as const
+
+const SSH_INK = 'rgba(226, 232, 240, 0.88)'
+const SSH_INK_HALO = 'rgba(15, 23, 42, 0.72)'
+const SSH_ZERO_INK = 'rgba(226, 232, 240, 0.40)'
+const LINE_WIDTH = 1.05
+const ZERO_WIDTH = 0.7
+const FAT_WIDTH = 3.15
 
 export function decodeSshAnomaly(
   rgba: Uint8ClampedArray,
@@ -23,7 +37,7 @@ export function decodeSshAnomaly(
 type Seg = [number, number, number, number]
 
 /**
- * Marching squares isoline segments in pixel space.
+ * Marching squares isoline segments in grid index space.
  * NaN cells (land / nodata) are skipped so lines stop at the coast.
  */
 export function isolineSegments(
@@ -101,7 +115,13 @@ function strokeSegs(
   ctx.stroke()
 }
 
-/** Draw fishing-chart SSH contours onto a transparent canvas (pixel = grid). */
+export interface SshGridDraw {
+  sla: Float32Array
+  cols: number
+  rows: number
+}
+
+/** Pixel-space draw (GIBS fallback decode or tests). One ink, 10 cm, fat 17. */
 export function drawSshContours(
   ctx: CanvasRenderingContext2D,
   grid: Float32Array,
@@ -109,30 +129,58 @@ export function drawSshContours(
   h: number,
 ): void {
   ctx.clearRect(0, 0, w, h)
+  paintLookLocked(ctx, grid, w, h, (x, y) => [x, y])
+}
+
+/** Screen-space draw from a geographic grid (one viewport, no tile seams). */
+export function drawSshContoursScreen(
+  ctx: CanvasRenderingContext2D,
+  grid: SshGridDraw & { west: number; south: number; east: number; north: number },
+  toScreen: (lng: number, lat: number) => { x: number; y: number },
+): void {
+  const { sla, cols, rows, west, south, east, north } = grid
+  const lngSpan = east - west
+  const latSpan = north - south
+  paintLookLocked(ctx, sla, cols, rows, (gx, gy) => {
+    const lng = west + (gx / Math.max(1, cols - 1)) * lngSpan
+    const lat = north - (gy / Math.max(1, rows - 1)) * latSpan
+    const p = toScreen(lng, lat)
+    return [p.x, p.y]
+  })
+}
+
+function paintLookLocked(
+  ctx: CanvasRenderingContext2D,
+  grid: Float32Array,
+  w: number,
+  h: number,
+  project: (x: number, y: number) => [number, number],
+): void {
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
   ctx.globalAlpha = 1
 
-  const zero = isolineSegments(grid, w, h, 0)
+  const mapSegs = (level: number): Seg[] =>
+    isolineSegments(grid, w, h, level).map(([x1, y1, x2, y2]) => {
+      const a = project(x1, y1)
+      const b = project(x2, y2)
+      return [a[0], a[1], b[0], b[1]]
+    })
+
+  const zero = mapSegs(0)
+  strokeSegs(ctx, zero, SSH_ZERO_INK, ZERO_WIDTH)
 
   for (const level of SSH_CONTOUR_LEVELS) {
-    if (level === 0) continue
-    const segs = isolineSegments(grid, w, h, level)
-    const mag = Math.abs(level)
-    const width = mag >= 0.2 ? 1.35 : mag >= 0.1 ? 1.1 : 0.85
-    const color = level < 0
-      ? mag >= 0.2 ? 'rgba(37, 99, 235, 0.85)' : 'rgba(56, 189, 248, 0.75)'
-      : mag >= 0.2 ? 'rgba(220, 38, 38, 0.85)' : 'rgba(249, 115, 22, 0.75)'
-    strokeSegs(ctx, segs, color, width)
+    strokeSegs(ctx, mapSegs(level), SSH_INK, LINE_WIDTH)
   }
 
-  // Fat zero-anomaly contour — the Loop / eddy edge captains fish.
+  const fat = mapSegs(SSH_FAT_M)
   ctx.save()
-  ctx.shadowColor = 'rgba(4, 12, 24, 0.85)'
+  ctx.shadowColor = SSH_INK_HALO
   ctx.shadowBlur = 2
-  strokeSegs(ctx, zero, 'rgba(226, 232, 240, 0.98)', 3.4)
+  strokeSegs(ctx, fat, SSH_INK, FAT_WIDTH)
   ctx.restore()
-  strokeSegs(ctx, zero, 'rgba(15, 23, 42, 0.95)', 1.15)
+  strokeSegs(ctx, fat, 'rgba(15, 23, 42, 0.9)', 1.05)
 }
 
 /** Isolated timing helper — decode + isolines, no canvas. */
@@ -148,6 +196,8 @@ export function measureSshContourWork(rgba: Uint8ClampedArray, w: number, h: num
   for (const level of SSH_CONTOUR_LEVELS) {
     segments += isolineSegments(grid, w, h, level).length
   }
+  segments += isolineSegments(grid, w, h, 0).length
+  segments += isolineSegments(grid, w, h, SSH_FAT_M).length
   const t2 = performance.now()
   return { decodeMs: t1 - t0, isolineMs: t2 - t1, segments }
 }

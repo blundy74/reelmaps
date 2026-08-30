@@ -14,6 +14,22 @@ const GIBS_WMS = 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi'
  */
 export const OSCAR_GIBS_TIME = '2024-07-17'
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
+
+/**
+ * Captain-facing age stamp. Derived from OSCAR_GIBS_TIME so the rail never
+ * dumps ISO or pretends this is a live current. Example: "OSCAR 17 Jul 2024".
+ */
+export function oscarAgeStamp(iso: string = OSCAR_GIBS_TIME): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  if (!m) return `OSCAR ${iso}`
+  const day = String(Number(m[3]))
+  const month = MONTHS[Number(m[2]) - 1] ?? m[2]
+  return `OSCAR ${day} ${month} ${m[1]}`
+}
+
+export const OSCAR_AGE_STAMP = oscarAgeStamp()
+
 const MS_TO_KT = 1.94384
 export const OSCAR_SPEED_MAX_KT = 4
 /** Below this: skip the glyph (noise / nodata). */

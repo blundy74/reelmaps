@@ -15,6 +15,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/proxy\/nowcoast/, ''),
       },
+      '/proxy/erddap': {
+        target: 'https://coastwatch.pfeg.noaa.gov',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/proxy\/erddap/, '/erddap'),
+      },
     },
   },
 })

@@ -11,6 +11,17 @@ export function toISODate(date: Date): string {
   return format(date, 'yyyy-MM-dd')
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
+
+/** Captain-facing day: `17 Jul 2024` — never dump ISO in a tooltip. */
+export function humanIsoDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  if (!m) return iso
+  const month = MONTHS[Number(m[2]) - 1]
+  if (!month) return iso
+  return `${Number(m[3])} ${month} ${m[1]}`
+}
+
 /** Yesterday's date — most satellite products have 1-day latency */
 export function getDefaultDate(): Date {
   return subDays(new Date(), 1)

@@ -1,6 +1,7 @@
 import { useMapStore } from '../../store/mapStore'
 import { useWeatherStore } from '../../store/weatherStore'
 import { SST_GRADIENT_CSS, sstLegendLabels } from '../../lib/sstPalette'
+import { OSCAR_AGE_STAMP } from '../../lib/oscarCurrents'
 
 interface LegendDef {
   layerId: string
@@ -8,6 +9,8 @@ interface LegendDef {
   unit: string
   gradient: string
   labels: { value: string; position: string }[]
+  /** Captain-visible age stamp — never ISO in a tooltip. */
+  stamp?: string
   /** If set, check weatherStore overlays instead of mapStore layers */
   isWeatherOverlay?: boolean
 }
@@ -74,6 +77,7 @@ export const LEGENDS: LegendDef[] = [
     layerId: 'current-arrows',
     title: 'Current speed',
     unit: 'kt',
+    stamp: OSCAR_AGE_STAMP,
     gradient: 'linear-gradient(to right, #7dd3fc, #eab308, #f97316, #ef4444)',
     labels: [
       { value: '0', position: '0%' },
@@ -84,12 +88,12 @@ export const LEGENDS: LegendDef[] = [
   {
     layerId: 'altimetry',
     title: 'SSH contours',
-    unit: '0 fat',
-    gradient: 'linear-gradient(to right, #2563eb, #e2e8f0 50%, #dc2626)',
+    unit: '17 cm Loop',
+    gradient: 'linear-gradient(to right, transparent, #e2e8f0 50%, transparent)',
     labels: [
-      { value: '−20 cm', position: '0%' },
-      { value: '0', position: '50%' },
-      { value: '+20 cm', position: '100%' },
+      { value: '10 cm', position: '0%' },
+      { value: '17 fat', position: '50%' },
+      { value: '0 thin', position: '100%' },
     ],
   },
   {
@@ -293,8 +297,13 @@ function withSstRange(def: LegendDef, minF: number, maxF: number): LegendDef {
   return { ...def, labels: sstLegendLabels(minF, maxF) }
 }
 
+function withSshStamp(def: LegendDef, sshStamp: string | null): LegendDef {
+  if (def.layerId !== 'altimetry' || !sshStamp) return def
+  return { ...def, stamp: sshStamp }
+}
+
 export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forecastBarOpen?: boolean; hidden?: boolean }) {
-  const { layers, sstRange } = useMapStore()
+  const { layers, sstRange, sshStamp } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
   const activeLegends = LEGENDS.filter((def) => {
@@ -302,7 +311,7 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
     return layers.find((l) => l.id === def.layerId)?.visible
-  }).map((def) => withSstRange(def, sstRange.minF, sstRange.maxF))
+  }).map((def) => withSshStamp(withSstRange(def, sstRange.minF, sstRange.maxF), sshStamp))
 
   if (hidden || !activeLegends.length) return null
 
@@ -317,6 +326,9 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
             <span className="text-xs font-semibold text-slate-300">{def.title}</span>
             <span className="text-xs text-slate-500 font-mono">{def.unit}</span>
           </div>
+          {def.stamp && (
+            <p className="text-[11px] font-semibold text-cyan-200 mb-1.5 tracking-wide">{def.stamp}</p>
+          )}
           <div
             className="h-2.5 w-full rounded-full"
             style={{ background: def.gradient }}
@@ -340,7 +352,7 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
 
 /** Compact legend pinned inside the right rail (Windy-class, not a map HUD). */
 export function PinnedLegend() {
-  const { layers, sstRange } = useMapStore()
+  const { layers, sstRange, sshStamp } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
   const activeLegends = LEGENDS.filter((def) => {
@@ -348,7 +360,7 @@ export function PinnedLegend() {
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
     return layers.find((l) => l.id === def.layerId)?.visible
-  }).map((def) => withSstRange(def, sstRange.minF, sstRange.maxF))
+  }).map((def) => withSshStamp(withSstRange(def, sstRange.minF, sstRange.maxF), sshStamp))
 
   if (!activeLegends.length) return null
 
@@ -363,6 +375,9 @@ export function PinnedLegend() {
             <span className="text-[10px] font-medium text-slate-300 truncate">{def.title}</span>
             <span className="text-[9px] text-slate-500 font-mono flex-shrink-0">{def.unit}</span>
           </div>
+          {def.stamp && (
+            <p className="text-[10px] font-semibold text-cyan-200 mb-1 tracking-wide">{def.stamp}</p>
+          )}
           <div className="h-1.5 w-full rounded-full" style={{ background: def.gradient }} />
           <div className="relative mt-0.5 h-3">
             {def.labels.filter((_, i) => i === 0 || i === def.labels.length - 1 || i === Math.floor(def.labels.length / 2)).map((label) => (
