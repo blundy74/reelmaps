@@ -78,7 +78,7 @@ type LayerStackMap = {
 
 /**
  * Put GLM FED on top of imagery (SST etc.), then fishing-spot layers above GLM.
- * Call whenever tiles apply and after later imagery rebuilds (map idle).
+ * Call whenever tiles apply, after FishingMap.syncLayers, and on map idle.
  */
 export function restackGlmAboveImagery(map: LayerStackMap): void {
   if (!map.getLayer(GLM_DENSITY_LAYER)) return
@@ -86,6 +86,40 @@ export function restackGlmAboveImagery(map: LayerStackMap): void {
   for (const id of GLM_SPOT_LAYER_IDS) {
     if (map.getLayer(id)) map.moveLayer(id)
   }
+}
+
+/**
+ * Insert new imagery rasters under live GLM so SST rebuilds cannot land on top.
+ * MapLibre addLayer without beforeId always appends — that is the UA 14 bury.
+ */
+export function glmImageryBeforeId(map: { getLayer(id: string): unknown }): string | undefined {
+  return map.getLayer(GLM_DENSITY_LAYER) ? GLM_DENSITY_LAYER : undefined
+}
+
+/** Spot layers FishingMap.syncLayers lifts after imagery add/rebuild. */
+export const FISHING_MAP_SYNC_SPOT_IDS = [
+  'clusters',
+  'cluster-count',
+  'fishing-spots',
+  'fishing-spots-rigs',
+  'fishing-spots-fads',
+  'fishing-spots-labels',
+  'user-clusters',
+  'user-cluster-count',
+  'user-spots',
+  'user-spots-labels',
+] as const
+
+/**
+ * End of FishingMap.syncLayers: spots to the top, then GLM above imagery
+ * and spots above GLM. UA 14 only moved spots, so a later SST addLayer
+ * left glm-density-layer under the new sst-mur.
+ */
+export function restackAfterFishingMapSync(map: LayerStackMap): void {
+  for (const id of FISHING_MAP_SYNC_SPOT_IDS) {
+    if (map.getLayer(id)) map.moveLayer(id)
+  }
+  restackGlmAboveImagery(map)
 }
 
 /** Vite same-origin proxy on :5173; production uses native https:// like Radar. */
