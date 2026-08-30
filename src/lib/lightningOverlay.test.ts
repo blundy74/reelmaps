@@ -13,10 +13,12 @@ import {
   LIGHTNING_HRRR_STAMP,
   LIGHTNING_HRRR_TITLE,
   chlorophyll7DaySubIds,
+  coveringTileZoom,
   glmFlashesFromApi,
   glmImageryBeforeId,
   glmTileCacheBust,
   hasRealEarthWatermarkHeader,
+  hideGlmDensityRaster,
   rgbaLooksLikeWatermark,
   hrrrForecastHour,
   hrrrNowOffsetHours,
@@ -28,10 +30,15 @@ import {
   realEarthGlmFedUrl,
   realEarthGlmHttpsUrl,
   realEarthGlmProbeUrl,
+  realEarthGlmTileUrl,
   restackAfterFishingMapSync,
   restackGlmAboveImagery,
+  tileCacheKey,
+  tileScreenRect,
   usesGibsGlm,
   usesIemGlmErrorTiles,
+  viewportBounds,
+  visibleXyzTiles,
 } from './lightningOverlay'
 
 function assert(cond: unknown, msg: string): asserts cond {
@@ -60,6 +67,17 @@ function main() {
   assert(probe.includes('/5/8/13.png'), 'Gulf probe tile')
   assert(!probe.includes('{z}'), 'probe is a concrete tile')
   assert(probe.includes('GOESEastGLMFEDRadC'), 'probe is RealEarth FED')
+
+  const tileUrl = realEarthGlmTileUrl(7, 31, 53, 1)
+  assert(tileUrl.includes('/7/31/53.png'), 'concrete FED tile')
+  assert(!tileUrl.includes('{z}'), 'tile url has no placeholders')
+  assert(!tileUrl.startsWith('noref://'), 'tile url is not noref')
+  assert(
+    tileUrl.startsWith('https://realearth.ssec.wisc.edu/') || tileUrl.startsWith('/proxy/realearth/'),
+    'tile url is native https or Vite proxy',
+  )
+  assert(!usesGibsGlm(tileUrl) && !usesIemGlmErrorTiles(tileUrl), 'tile url stays off GIBS/IEM')
+  assert(tileCacheKey(1, { z: 7, x: 31, y: 53 }) === '1/7/31/53', 'cache key')
 
   const radarOnly = [
     { id: 'radar', visible: true },
@@ -201,15 +219,43 @@ function main() {
     const vite = realEarthGlmFedUrl(1)
     assert(vite.startsWith('/proxy/realearth/'), 'Vite :5173 uses same-origin proxy')
     assert(!vite.startsWith('noref://'), 'Vite path is not noref')
+    const viteTile = realEarthGlmTileUrl(7, 33, 53, 1)
+    assert(viteTile.startsWith('/proxy/realearth/'), 'Vite tile is same-origin proxy')
+    assert(viteTile.includes('/7/33/53.png'), 'Vite tile xyz')
 
     g.window = { location: { port: '' } }
     const amplify = realEarthGlmFedUrl(1)
     assert(amplify === httpsUrl, 'Amplify uses native https template')
     assert(!amplify.startsWith('noref://'), 'Amplify is not noref')
+    const ampTile = realEarthGlmTileUrl(7, 33, 53, 1)
+    assert(ampTile.startsWith('https://realearth.ssec.wisc.edu/tiles/GOESEastGLMFEDRadC/7/33/53.png'), 'Amplify tile is native https')
+    assert(!ampTile.startsWith('noref://'), 'Amplify tile is not noref')
   } finally {
     if (prev === undefined) delete g.window
     else g.window = prev
   }
+
+  // UA 16: canvas FED covering — Gulf 29.3863°N 88.3037°W z≈6.4 includes 7/31–33/53.
+  assert(coveringTileZoom(6.4) === 7, 'z≈6.4 covers with z=7 FED tiles')
+  assert(coveringTileZoom(6) === 6, 'integer zoom stays 1:1')
+  assert(coveringTileZoom(8.9) === 8, 'cap at GLM max zoom')
+  const gulf = viewportBounds({ lat: 29.3863, lon: -88.3037 }, 6.4, 1100, 700)
+  const gulfTiles = visibleXyzTiles(gulf, 6.4)
+  assert(gulfTiles.length > 0 && gulfTiles.every((t) => t.z === 7), 'Gulf covering zoom is 7')
+  const has = (x: number, y: number) => gulfTiles.some((t) => t.z === 7 && t.x === x && t.y === y)
+  assert(has(31, 53), 'includes 7/31/53')
+  assert(has(32, 53), 'includes 7/32/53')
+  assert(has(33, 53), 'includes 7/33/53')
+
+  const rect = tileScreenRect({ z: 7, x: 32, y: 53 }, ([lon, lat]) => ({ x: lon, y: -lat }))
+  assert(rect.w > 0 && rect.h > 0, 'tile NW/SE projects to a positive screen rect')
+
+  const hideCalls: string[] = []
+  hideGlmDensityRaster({
+    getLayer: (id) => (id === GLM_DENSITY_LAYER ? { id } : undefined),
+    setLayoutProperty: (id, key, value) => { hideCalls.push(`${id}:${key}:${String(value)}`) },
+  })
+  assert(hideCalls[0] === `${GLM_DENSITY_LAYER}:visibility:none`, 'canvas path hides MapLibre GLM raster')
 
   console.log('lightningOverlay.test.ts: ok')
 }

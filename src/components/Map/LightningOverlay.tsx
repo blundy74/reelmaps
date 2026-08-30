@@ -1,12 +1,13 @@
 /**
  * LightningOverlay — live lightning for the OVERLAYS Lightning chip (`id === 'lightning'`).
  *
- *   1. RealEarth GOES-East GLM Flash Extent Density (5-min XYZ) — the visible product
+ *   1. RealEarth GOES-East GLM FED — painted on this <canvas> (above SST)
  *   2. GLM individual flashes (canvas) — only when /glm/flashes returns points
- *   3. HRRR lightning tiles — fallback if RealEarth fails after a couple of tries
+ *   3. HRRR lightning tiles — MapLibre raster fallback if RealEarth fails
  *
- * Radar does not turn this on. HRRR lightning forecast (`hrrr-lightning`) is a
- * separate overlay. Do not wait on Lambda; raster FED is the live layer.
+ * Sparse transparent FED PNGs are invisible over opaque MUR in MapLibre
+ * raster-over-raster compositing (UA 15 z-order was already correct).
+ * Radar does not turn this on. Do not invent flashes from an empty API.
  */
 
 import { useEffect, useRef, useCallback } from 'react'
@@ -19,13 +20,18 @@ import {
   glmFlashesFromApi,
   glmTileCacheBust,
   hasRealEarthWatermarkHeader,
+  hideGlmDensityRaster,
   hrrrLightningFallbackUrl,
   isUsableRasterTile,
   lightningChipVisible,
-  realEarthGlmFedUrl,
   realEarthGlmProbeUrl,
+  realEarthGlmTileUrl,
   restackGlmAboveImagery,
+  tileCacheKey,
+  tileScreenRect,
+  visibleXyzTiles,
   type LightningProduct,
+  type XyzTile,
 } from '../../lib/lightningOverlay'
 
 interface Props {
@@ -45,6 +51,62 @@ const GLM_LAYER = GLM_DENSITY_LAYER
 const GLM_API = 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com/glm/flashes'
 const FLASH_MAX_AGE = 10000
 const POLL_INTERVAL = 20000
+const FED_CACHE_SOFT_MAX = 80
+const FED_CACHE_TARGET = 48
+
+interface CachedFedTile {
+  img: HTMLImageElement
+  ready: boolean
+}
+
+function ensureFedTiles(
+  cache: Map<string, CachedFedTile>,
+  tiles: XyzTile[],
+  bust: number | string,
+): void {
+  const wanted = new Set<string>()
+  for (const tile of tiles) {
+    const key = tileCacheKey(bust, tile)
+    wanted.add(key)
+    if (cache.has(key)) continue
+    const img = new Image()
+    img.referrerPolicy = 'no-referrer'
+    img.decoding = 'async'
+    const entry: CachedFedTile = { img, ready: false }
+    cache.set(key, entry)
+    img.onload = () => { entry.ready = img.naturalWidth > 0 }
+    img.onerror = () => { cache.delete(key) }
+    img.src = realEarthGlmTileUrl(tile.z, tile.x, tile.y, bust)
+  }
+  if (cache.size <= FED_CACHE_SOFT_MAX) return
+  for (const key of cache.keys()) {
+    if (wanted.has(key)) continue
+    cache.delete(key)
+    if (cache.size <= FED_CACHE_TARGET) break
+  }
+}
+
+function drawFedTiles(
+  ctx: CanvasRenderingContext2D,
+  map: maplibregl.Map,
+  cache: Map<string, CachedFedTile>,
+  tiles: XyzTile[],
+  bust: number | string,
+  opacity: number,
+): void {
+  ctx.save()
+  ctx.globalAlpha = opacity
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.imageSmoothingEnabled = false
+  for (const tile of tiles) {
+    const entry = cache.get(tileCacheKey(bust, tile))
+    if (!entry?.ready) continue
+    const rect = tileScreenRect(tile, (ll) => map.project(ll))
+    if (rect.w <= 1 || rect.h <= 1) continue
+    ctx.drawImage(entry.img, rect.x, rect.y, rect.w, rect.h)
+  }
+  ctx.restore()
+}
 
 async function probeRealEarthImage(url: string): Promise<boolean> {
   try {
@@ -76,6 +138,7 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
   const productRef = useRef<LightningProduct>('glm')
   const failCount = useRef(0)
   const probing = useRef(false)
+  const fedCacheRef = useRef<Map<string, CachedFedTile>>(new Map())
 
   const lightningVisible = useWeatherStore((s) => lightningChipVisible(s.overlays))
   const opacity = useWeatherStore(
@@ -143,10 +206,18 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
   }, [mapRef, setLightningProduct])
 
   const showGlm = useCallback(() => {
-    applyTiles(realEarthGlmFedUrl(glmTileCacheBust()), 'glm')
-  }, [applyTiles])
+    const map = mapRef.current
+    if (map) {
+      try { hideGlmDensityRaster(map) } catch { /* style not ready */ }
+    }
+    if (productRef.current !== 'glm') {
+      productRef.current = 'glm'
+      setLightningProduct('glm')
+    }
+  }, [mapRef, setLightningProduct])
 
   const showHrrr = useCallback(async () => {
+    fedCacheRef.current.clear()
     const url = await hrrrLightningFallbackUrl(forecastHourRef.current, hourlyRef.current)
     if (url) applyTiles(url, 'hrrr')
     else {
@@ -212,6 +283,7 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
       const ctx = canvasRef.current?.getContext('2d')
       if (ctx && canvasRef.current) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
       flashesRef.current = []
+      fedCacheRef.current.clear()
       if (pollTimer.current) clearInterval(pollTimer.current)
       if (refreshTimer.current) clearInterval(refreshTimer.current)
       cancelAnimationFrame(animRef.current)
@@ -240,7 +312,7 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
       setTimeout(run, 50)
     }
     map.on('style.load', onStyleLoad)
-    // Later SST / colormap rebuilds addLayer after GLM — keep FED on top.
+    // HRRR fallback is still a MapLibre raster — keep it above imagery.
     map.on('idle', restack)
     const restackTimer = window.setTimeout(restack, 250)
 
@@ -248,6 +320,7 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
     pollTimer.current = setInterval(fetchFlashes, POLL_INTERVAL)
     refreshTimer.current = setInterval(() => {
       lastTileUrl.current = ''
+      fedCacheRef.current.clear()
       void probeAndPaint()
     }, GLM_TILE_REFRESH_MS)
 
@@ -262,6 +335,22 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
       const ch = container.clientHeight
 
       ctx.clearRect(0, 0, cw, ch)
+
+      if (productRef.current === 'glm') {
+        try {
+          const bounds = map.getBounds()
+          const tiles = visibleXyzTiles({
+            west: bounds.getWest(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            north: bounds.getNorth(),
+          }, map.getZoom())
+          const bust = glmTileCacheBust()
+          ensureFedTiles(fedCacheRef.current, tiles, bust)
+          drawFedTiles(ctx, map, fedCacheRef.current, tiles, bust, opacityRef.current)
+        } catch { /* style / project not ready */ }
+      }
+
       flashesRef.current = flashesRef.current.filter((f) => now - f.receivedAt < FLASH_MAX_AGE)
 
       for (const flash of flashesRef.current) {
@@ -335,11 +424,8 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
     if (productRef.current === 'hrrr') {
       lastTileUrl.current = ''
       void showHrrr()
-    } else {
-      try {
-        mapRef.current?.setPaintProperty(GLM_LAYER, 'raster-opacity', opacity)
-      } catch { /* layer not mounted yet */ }
     }
+    // GLM opacity is applied while painting FED on the canvas (opacityRef).
   }, [lightningVisible, forecastHour, opacity, showHrrr, mapRef])
 
   useEffect(() => {
@@ -350,6 +436,7 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
         if (map.getLayer(GLM_LAYER)) map.removeLayer(GLM_LAYER)
         if (map.getSource(GLM_SOURCE)) map.removeSource(GLM_SOURCE)
       } catch { /* disposed */ }
+      fedCacheRef.current.clear()
       if (pollTimer.current) clearInterval(pollTimer.current)
       if (refreshTimer.current) clearInterval(refreshTimer.current)
     }

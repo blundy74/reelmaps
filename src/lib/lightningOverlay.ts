@@ -1,5 +1,8 @@
 /**
  * Live lightning (OVERLAYS chip id `lightning`) — RealEarth GOES-East GLM FED.
+ * Live GLM is painted on the LightningOverlay <canvas> (DOM above SST).
+ * The MapLibre glm-density-layer raster is HRRR fallback only — sparse FED
+ * PNGs are invisible over opaque MUR when MapLibre composites raster-on-raster.
  * HRRR lightning (`hrrr-lightning`) is a separate forecast overlay.
  */
 
@@ -42,6 +45,19 @@ export function glmTileCacheBust(nowMs = Date.now()): number {
 }
 
 export const GLM_DENSITY_LAYER = 'glm-density-layer'
+/** Native FED tile zoom cap — overzoom these rather than requesting empty z9+. */
+export const GLM_FED_MAX_ZOOM = 8
+export const GLM_FED_MAX_TILES = 64
+const MERCATOR_MAX_LAT = 85.0511287798066
+
+export type XyzTile = { z: number; x: number; y: number }
+
+export type LonLatBounds = {
+  west: number
+  south: number
+  east: number
+  north: number
+}
 
 /** Same list RadarOverlay uses, plus FADs — stay above GLM after restack. */
 export const GLM_SPOT_LAYER_IDS = [
@@ -77,8 +93,8 @@ type LayerStackMap = {
 }
 
 /**
- * Put GLM FED on top of imagery (SST etc.), then fishing-spot layers above GLM.
- * Call whenever tiles apply, after FishingMap.syncLayers, and on map idle.
+ * Put the MapLibre lightning raster (HRRR fallback) on top of imagery, then
+ * fishing-spot layers above it. Live GLM FED is a DOM canvas, not this layer.
  */
 export function restackGlmAboveImagery(map: LayerStackMap): void {
   if (!map.getLayer(GLM_DENSITY_LAYER)) return
@@ -111,15 +127,155 @@ export const FISHING_MAP_SYNC_SPOT_IDS = [
 ] as const
 
 /**
- * End of FishingMap.syncLayers: spots to the top, then GLM above imagery
- * and spots above GLM. UA 14 only moved spots, so a later SST addLayer
- * left glm-density-layer under the new sst-mur.
+ * End of FishingMap.syncLayers: spots to the top, then the MapLibre lightning
+ * raster (HRRR) above imagery and spots above that raster.
  */
 export function restackAfterFishingMapSync(map: LayerStackMap): void {
   for (const id of FISHING_MAP_SYNC_SPOT_IDS) {
     if (map.getLayer(id)) map.moveLayer(id)
   }
   restackGlmAboveImagery(map)
+}
+
+/** Hide MapLibre GLM raster while the canvas overlay is the live product. */
+export function hideGlmDensityRaster(map: {
+  getLayer(id: string): unknown
+  setLayoutProperty(id: string, key: string, value: unknown): void
+}): void {
+  if (!map.getLayer(GLM_DENSITY_LAYER)) return
+  map.setLayoutProperty(GLM_DENSITY_LAYER, 'visibility', 'none')
+}
+
+export function clampMercatorLat(lat: number): number {
+  return Math.min(MERCATOR_MAX_LAT, Math.max(-MERCATOR_MAX_LAT, lat))
+}
+
+export function lonToTileX(lon: number, z: number): number {
+  return ((lon + 180) / 360) * 2 ** z
+}
+
+export function latToTileY(lat: number, z: number): number {
+  const latRad = clampMercatorLat(lat) * Math.PI / 180
+  return (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * 2 ** z
+}
+
+export function tileXToLon(x: number, z: number): number {
+  return (x / 2 ** z) * 360 - 180
+}
+
+export function tileYToLat(y: number, z: number): number {
+  return Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z))) * 180 / Math.PI
+}
+
+function mercatorY(lat: number): number {
+  const latRad = clampMercatorLat(lat) * Math.PI / 180
+  return (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2
+}
+
+function mercatorYToLat(y: number): number {
+  return Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180 / Math.PI
+}
+
+/** Axis-aligned WebMercator bounds for a camera + CSS viewport size. */
+export function viewportBounds(
+  center: { lat: number; lon: number },
+  zoom: number,
+  widthPx: number,
+  heightPx: number,
+): LonLatBounds {
+  const world = 256 * 2 ** zoom
+  const lngSpan = (widthPx / world) * 360
+  const mercSpan = heightPx / world
+  const cy = mercatorY(center.lat)
+  return {
+    west: center.lon - lngSpan / 2,
+    east: center.lon + lngSpan / 2,
+    north: mercatorYToLat(cy - mercSpan / 2),
+    south: mercatorYToLat(cy + mercSpan / 2),
+  }
+}
+
+/**
+ * Integer XYZ zoom that covers the map. ceil so z≈6.4 uses z=7 FED tiles
+ * (the live RealEarth cells for the Gulf UA 15 screenshot).
+ */
+export function coveringTileZoom(
+  mapZoom: number,
+  minZ = 0,
+  maxZ = GLM_FED_MAX_ZOOM,
+): number {
+  if (!Number.isFinite(mapZoom)) return minZ
+  return Math.max(minZ, Math.min(maxZ, Math.ceil(mapZoom - 1e-9)))
+}
+
+function wrappedTileXs(west: number, east: number, z: number): number[] {
+  const n = 2 ** z
+  const xStart = Math.floor(lonToTileX(west, z))
+  const xEnd = Math.floor(lonToTileX(east, z))
+  const xs: number[] = []
+  const seen = new Set<number>()
+  const push = (x: number) => {
+    const wrapped = ((x % n) + n) % n
+    if (seen.has(wrapped)) return
+    seen.add(wrapped)
+    xs.push(wrapped)
+  }
+  if (west <= east) {
+    for (let x = xStart; x <= xEnd; x++) push(x)
+  } else {
+    for (let x = xStart; x < n; x++) push(x)
+    for (let x = 0; x <= xEnd; x++) push(x)
+  }
+  return xs
+}
+
+export function xyzTilesAtZoom(bounds: LonLatBounds, z: number): XyzTile[] {
+  const n = 2 ** z
+  const y0 = Math.max(0, Math.min(n - 1, Math.floor(latToTileY(bounds.north, z))))
+  const y1 = Math.max(0, Math.min(n - 1, Math.floor(latToTileY(bounds.south, z))))
+  const yMin = Math.min(y0, y1)
+  const yMax = Math.max(y0, y1)
+  const tiles: XyzTile[] = []
+  for (const x of wrappedTileXs(bounds.west, bounds.east, z)) {
+    for (let y = yMin; y <= yMax; y++) tiles.push({ z, x, y })
+  }
+  return tiles
+}
+
+/** Visible OSM XYZ tiles for map bounds + covering zoom. */
+export function visibleXyzTiles(
+  bounds: LonLatBounds,
+  mapZoom: number,
+  opts?: { minZ?: number; maxZ?: number; maxTiles?: number },
+): XyzTile[] {
+  const minZ = opts?.minZ ?? 0
+  const maxZ = opts?.maxZ ?? GLM_FED_MAX_ZOOM
+  const maxTiles = opts?.maxTiles ?? GLM_FED_MAX_TILES
+  let z = coveringTileZoom(mapZoom, minZ, maxZ)
+  while (z > minZ) {
+    const tiles = xyzTilesAtZoom(bounds, z)
+    if (tiles.length <= maxTiles) return tiles
+    z -= 1
+  }
+  return xyzTilesAtZoom(bounds, minZ).slice(0, maxTiles)
+}
+
+export function tileCacheKey(bust: number | string, tile: XyzTile): string {
+  return `${bust}/${tile.z}/${tile.x}/${tile.y}`
+}
+
+/** Screen-axis rect from projecting the tile's NW / SE lon-lat. */
+export function tileScreenRect(
+  tile: XyzTile,
+  project: (lngLat: [number, number]) => { x: number; y: number },
+): { x: number; y: number; w: number; h: number } {
+  const west = tileXToLon(tile.x, tile.z)
+  const east = tileXToLon(tile.x + 1, tile.z)
+  const north = tileYToLat(tile.y, tile.z)
+  const south = tileYToLat(tile.y + 1, tile.z)
+  const nw = project([west, north])
+  const se = project([east, south])
+  return { x: nw.x, y: nw.y, w: se.x - nw.x, h: se.y - nw.y }
 }
 
 /** Vite same-origin proxy on :5173; production uses native https:// like Radar. */
@@ -133,6 +289,19 @@ export function realEarthGlmFedUrl(cacheBust: number | string = glmTileCacheBust
 
 export function realEarthGlmHttpsUrl(cacheBust: number | string = glmTileCacheBust()): string {
   return `${REALEARTH_GLM_FED_BASE}/{z}/{x}/{y}.png?t=${cacheBust}`
+}
+
+/** Concrete RealEarth FED tile (same Vite-vs-https rule as the template). */
+export function realEarthGlmTileUrl(
+  z: number,
+  x: number,
+  y: number,
+  cacheBust: number | string = glmTileCacheBust(),
+): string {
+  return realEarthGlmFedUrl(cacheBust)
+    .replace('{z}', String(z))
+    .replace('{x}', String(x))
+    .replace('{y}', String(y))
 }
 
 export function realEarthGlmProbeUrl(cacheBust: number | string = glmTileCacheBust()): string {
