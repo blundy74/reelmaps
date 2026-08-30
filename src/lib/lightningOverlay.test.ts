@@ -3,11 +3,15 @@
  * Run: npx --yes tsx src/lib/lightningOverlay.test.ts
  */
 import {
+  GLM_DENSITY_LAYER,
+  GLM_IMAGERY_BELOW_IDS,
+  GLM_SPOT_LAYER_IDS,
   GLM_TILE_REFRESH_MS,
   LIGHTNING_GLM_STAMP,
   LIGHTNING_GLM_TITLE,
   LIGHTNING_HRRR_STAMP,
   LIGHTNING_HRRR_TITLE,
+  chlorophyll7DaySubIds,
   glmFlashesFromApi,
   glmTileCacheBust,
   hasRealEarthWatermarkHeader,
@@ -15,11 +19,14 @@ import {
   hrrrForecastHour,
   hrrrNowOffsetHours,
   isUsableRasterTile,
+  layersThatMustStayBelowGlm,
   lightningChipVisible,
   lightningLegend,
   radarForcesLightning,
   realEarthGlmFedUrl,
+  realEarthGlmHttpsUrl,
   realEarthGlmProbeUrl,
+  restackGlmAboveImagery,
   usesGibsGlm,
   usesIemGlmErrorTiles,
 } from './lightningOverlay'
@@ -30,13 +37,21 @@ function assert(cond: unknown, msg: string): asserts cond {
 
 function main() {
   const glmUrl = realEarthGlmFedUrl(1)
+  const httpsUrl = realEarthGlmHttpsUrl(1)
+  assert(httpsUrl === 'https://realearth.ssec.wisc.edu/tiles/GOESEastGLMFEDRadC/{z}/{x}/{y}.png?t=1', 'https template')
   assert(glmUrl.includes('tiles/GOESEastGLMFEDRadC/{z}/{x}/{y}.png'), 'RealEarth FED xyz')
-  assert(glmUrl.startsWith('noref://') || glmUrl.startsWith('/proxy/realearth/'), 'not a raw third-party image URL')
+  assert(
+    glmUrl.startsWith('https://realearth.ssec.wisc.edu/') || glmUrl.startsWith('/proxy/realearth/'),
+    'production is native https like Radar; Vite :5173 uses /proxy/realearth',
+  )
+  assert(!glmUrl.startsWith('noref://'), 'Amplify must not use noref:// for GLM')
+  assert(httpsUrl.startsWith('https://realearth.ssec.wisc.edu/tiles/GOESEastGLMFEDRadC/'), 'https helper')
   assert(glmUrl.includes('{z}/{x}/{y}.png'), 'OSM xyz placeholders')
   assert(glmUrl.includes('?t=1'), 'cache-bust query')
   assert(!usesGibsGlm(glmUrl), 'GIBS GLM density is gone')
   assert(!usesIemGlmErrorTiles(glmUrl), 'do not use IEM fake-red tiles')
   assert(!glmUrl.includes('GOES-East_GLM_Flash_Extent_Density'), 'no GIBS layer id')
+  assert(!usesGibsGlm(httpsUrl) && !usesIemGlmErrorTiles(httpsUrl), 'https helper stays off GIBS/IEM')
 
   const probe = realEarthGlmProbeUrl(1)
   assert(probe.includes('/5/8/13.png'), 'Gulf probe tile')
@@ -91,6 +106,64 @@ function main() {
   const a = glmTileCacheBust(0)
   const b = glmTileCacheBust(GLM_TILE_REFRESH_MS)
   assert(b === a + 1, 'cache-bust steps every 5 min')
+
+  assert(GLM_IMAGERY_BELOW_IDS.includes('sst-mur'), 'SST analysis stays under GLM')
+  assert(GLM_IMAGERY_BELOW_IDS.includes('satellite-imagery'), 'sat imagery stays under GLM')
+  assert(chlorophyll7DaySubIds().includes('chlorophyll-7day-d0'), '7-day chl sublayers listed')
+  assert(layersThatMustStayBelowGlm().includes('chlorophyll-7day-d6'), 'chl-7day-d6 under GLM')
+  assert(GLM_SPOT_LAYER_IDS.includes('fishing-spots-fads'), 'FADs restack above GLM')
+
+  const stack: string[] = [
+    'sst-mur',
+    GLM_DENSITY_LAYER,
+    'chlorophyll-7day-d0',
+    'fishing-spots',
+  ]
+  const fakeMap = {
+    getLayer: (id: string) => (stack.includes(id) ? { id } : undefined),
+    moveLayer: (id: string) => {
+      const i = stack.indexOf(id)
+      if (i < 0) return
+      stack.splice(i, 1)
+      stack.push(id)
+    },
+  }
+  restackGlmAboveImagery(fakeMap)
+  assert(stack.indexOf(GLM_DENSITY_LAYER) > stack.indexOf('sst-mur'), 'GLM above SST')
+  assert(stack.indexOf(GLM_DENSITY_LAYER) > stack.indexOf('chlorophyll-7day-d0'), 'GLM above chl-7day')
+  assert(stack.indexOf('fishing-spots') > stack.indexOf(GLM_DENSITY_LAYER), 'spots above GLM')
+  assert(stack[stack.length - 1] === 'fishing-spots', 'spots last after restack')
+
+  const buried: string[] = [GLM_DENSITY_LAYER, 'sst-mur', 'clusters']
+  const buriedMap = {
+    getLayer: (id: string) => (buried.includes(id) ? { id } : undefined),
+    moveLayer: (id: string) => {
+      const i = buried.indexOf(id)
+      if (i < 0) return
+      buried.splice(i, 1)
+      buried.push(id)
+    },
+  }
+  restackGlmAboveImagery(buriedMap)
+  assert(buried.indexOf('sst-mur') < buried.indexOf(GLM_DENSITY_LAYER), 'idle restack unburies GLM')
+  assert(buried.indexOf('clusters') > buried.indexOf(GLM_DENSITY_LAYER), 'clusters stay on top')
+
+  const g = globalThis as { window?: { location: { port: string } } }
+  const prev = g.window
+  try {
+    g.window = { location: { port: '5173' } }
+    const vite = realEarthGlmFedUrl(1)
+    assert(vite.startsWith('/proxy/realearth/'), 'Vite :5173 uses same-origin proxy')
+    assert(!vite.startsWith('noref://'), 'Vite path is not noref')
+
+    g.window = { location: { port: '' } }
+    const amplify = realEarthGlmFedUrl(1)
+    assert(amplify === httpsUrl, 'Amplify uses native https template')
+    assert(!amplify.startsWith('noref://'), 'Amplify is not noref')
+  } finally {
+    if (prev === undefined) delete g.window
+    else g.window = prev
+  }
 
   console.log('lightningOverlay.test.ts: ok')
 }
