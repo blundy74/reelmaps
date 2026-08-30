@@ -134,7 +134,7 @@ export function salinityUrl(date: string): string {
   })}`
 }
 
-/** NOAA nowCOAST RTOFS surface currents (Advanced raster). Lazy: only fetched when toggled. */
+/** NOAA nowCOAST RTOFS zonal surface currents. Lazy: only fetched when toggled. */
 export function currentsUrl(_date: string): string[] {
   const base = 'smooth://nowcoast.noaa.gov/geoserver/grtofs/wms'
   const params = [
@@ -146,7 +146,7 @@ export function currentsUrl(_date: string): string[] {
   return [`${base}?${params}&BBOX={bbox-epsg-3857}`]
 }
 
-/** NASA GIBS SSH anomaly fill (Advanced heatmap). Lazy: only fetched when toggled. */
+/** NASA GIBS SSH anomaly fill (heatmap). Lazy: only fetched when toggled. */
 export function sshAnomalyUrl(_date: string): string {
   const base = GIBS_WMS.replace('https://', 'smooth://')
   return `${base}?${wmsParams({
@@ -317,8 +317,7 @@ export interface LayerDef {
   maxzoom?: number
   tileSize?: number
   attribution: string
-  advanced?: boolean
-  /** Default-off rasters kept in the registry but not listed in the panel. */
+  /** When true, LayerPanel hides the row. Listed layers omit this or set false. */
   unlisted?: boolean
 }
 
@@ -407,24 +406,22 @@ export const LAYER_REGISTRY: LayerDef[] = [
   {
     id: 'currents',
     name: 'Ocean Currents (raster)',
-    description: 'Unlisted — NOAA RTOFS zonal current fill. The fishing picture is Current Arrows (0–4 kt), not this red-blue field.',
+    description: 'NOAA RTOFS zonal current fill (east–west). Not Current Arrows — those 0–4 kt fishing arrows are a different layer. This is a red-blue field.',
     group: 'oceanography',
     sourceType: 'raster-wms',
     dateDependent: false,
     attribution: 'NOAA nowCOAST RTOFS/HYCOM',
-    advanced: true,
-    unlisted: true,
+    unlisted: false,
   },
   {
     id: 'ssh-anomaly',
     name: 'SSH Fill',
-    description: 'Unlisted — rainbow sea-surface-height fill. Prefer SSH Contours (fat 0 anomaly) on SST instead of a third heatmap.',
+    description: 'Rainbow sea-surface-height fill. Not SSH Contours — those fat-0 isolines are a different layer. A third heatmap; leave off unless you want the fill.',
     group: 'oceanography',
     sourceType: 'raster-wms',
     dateDependent: false,
     attribution: 'JPL MEaSUREs via NASA GIBS',
-    advanced: true,
-    unlisted: true,
+    unlisted: false,
   },
   {
     id: 'sst-goes',

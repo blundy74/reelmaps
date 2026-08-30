@@ -74,7 +74,6 @@ function mergeLayersFromRegistry(prev?: MapLayer[]): MapLayer[] {
       opacity: old?.opacity ?? DEFAULT_OPACITY[def.id] ?? 0.8,
       hasDateControl: def.dateDependent,
       attribution: def.attribution,
-      advanced: def.advanced,
       unlisted: def.unlisted,
     }
   })
@@ -259,7 +258,7 @@ export const useMapStore = create<MapState>()(
           sstRange = DEFAULT_SST_RANGE
         }
         const layers = mergeLayersFromRegistry(state.layers)
-        // v14/v15: arrows + SSH contours on; raster fill / zonal currents off and unlisted.
+        // v14/v15: arrows + SSH contours on; raster fill / zonal currents stay off.
         if (version < 15) {
           for (const l of layers) {
             if (l.id === 'current-arrows' || l.id === 'altimetry') l.visible = true

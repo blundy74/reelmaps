@@ -36,9 +36,7 @@ export interface MapLayer {
   hasDateControl: boolean
   attribution?: string
   legend?: LayerLegend
-  /** Off-by-default diagnostic / fill — not the fishing picture. */
-  advanced?: boolean
-  /** Kept in store, not shown in LayerPanel (Oceanography Advanced rasters). */
+  /** When true, LayerPanel hides the row. Listed layers omit this or set false. */
   unlisted?: boolean
 }
 

@@ -1,6 +1,6 @@
 /**
  * Custom MapLibre protocol: fetch a raster tile, apply a light blur,
- * return PNG bytes. Used by the Advanced oceanography rasters
+ * return PNG bytes. Used by the optional oceanography rasters
  * (currents, ssh-anomaly) — those stay off until toggled.
  *
  * Processed tiles are LRU-cached so a second pan does not re-decode.
