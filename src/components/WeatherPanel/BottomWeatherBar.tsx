@@ -12,8 +12,6 @@ import { cn } from '../../lib/utils'
 export default function BottomWeatherBar() {
   const {
     panelOpen,
-    location,
-    current,
     hourly,
     loading,
     fetchWeather,
@@ -36,35 +34,46 @@ export default function BottomWeatherBar() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const playheadLineRef = useRef<HTMLDivElement>(null)
   const progressFillRef = useRef<HTMLDivElement>(null)
+  const snappedToNow = useRef(false)
 
-  // Auto-fetch weather when pin/click changes
+  // Weather follows the map center (or pin / click). Footer coords = header.
   useEffect(() => {
     if (!panelOpen) return
-    const loc = droppedPin ?? clickedPoint
-    if (loc) fetchWeather(loc.lat, loc.lng)
-  }, [panelOpen, droppedPin, clickedPoint, fetchWeather])
-
-  // Default fetch — deferred so it doesn't block page load
-  const initialFetchDone = useRef(false)
-  useEffect(() => {
-    if (!panelOpen || current || loading || location || initialFetchDone.current) return
-    initialFetchDone.current = true
-    const timer = setTimeout(() => {
-      const { viewState } = useMapStore.getState()
-      fetchWeather(viewState.latitude, viewState.longitude)
-    }, 3000)
-    return () => clearTimeout(timer)
-  }, [panelOpen, current, loading, location, fetchWeather])
+    const loc = droppedPin ?? clickedPoint ?? { lat: viewState.latitude, lng: viewState.longitude }
+    const timer = window.setTimeout(() => {
+      fetchWeather(loc.lat, loc.lng)
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [panelOpen, droppedPin, clickedPoint, viewState.latitude, viewState.longitude, fetchWeather])
 
   // Keep the playhead in sync when the user picks a column (or the rail table)
   useEffect(() => {
     if (playing) return
-    const i = Math.max(0, Math.min(Math.round(selectedForecastHour), Math.min(hourly.length, 26) - 1))
+    const barLen = Math.min(hourly.length, 26)
+    if (barLen <= 0) return
+    if (!snappedToNow.current && hourly.length) {
+      snappedToNow.current = true
+      const now = Date.now()
+      let best = 0
+      let bestAbs = Infinity
+      hourly.slice(0, barLen).forEach((h, i) => {
+        const d = Math.abs(new Date(h.time).getTime() - now)
+        if (d < bestAbs) {
+          bestAbs = d
+          best = i
+        }
+      })
+      setSelectedIndex(best)
+      hourRef.current = best
+      setSelectedForecastHour(best)
+      return
+    }
+    const i = Math.max(0, Math.min(Math.round(selectedForecastHour), barLen - 1))
     if (Number.isFinite(i) && i >= 0) {
       setSelectedIndex(i)
       hourRef.current = i
     }
-  }, [selectedForecastHour, playing, hourly.length])
+  }, [selectedForecastHour, playing, hourly, setSelectedForecastHour])
 
   // rAF playback — seconds-per-hour from settings (default 0.25s ≈ Windy)
   useEffect(() => {
@@ -217,14 +226,14 @@ export default function BottomWeatherBar() {
                   setPlaying(false)
                 }}
                 className={cn(
-                  'relative flex flex-col items-center gap-0 px-1 py-1 rounded min-w-[42px] text-center overflow-hidden',
+                  'relative flex flex-col items-center gap-0 px-1 py-1 rounded min-w-[42px] text-center overflow-hidden border',
                   isSelected
-                    ? 'bg-cyan-400 text-ocean-950 border-2 border-white shadow-[0_0_12px_rgba(34,211,238,0.65)] scale-105 z-[1]'
+                    ? 'bg-cyan-400 text-ocean-950 border-white shadow-[0_0_12px_rgba(34,211,238,0.65)] scale-105 z-[1]'
                     : isMidnight
-                    ? 'bg-ocean-800/80 hover:bg-ocean-700/60 border border-transparent'
+                    ? 'bg-ocean-800/80 hover:bg-ocean-700/60 border-transparent'
                     : isPast
-                    ? 'opacity-70 hover:opacity-100 hover:bg-ocean-800/40 border border-transparent'
-                    : 'hover:bg-ocean-800/40 border border-transparent',
+                    ? 'opacity-70 hover:opacity-100 hover:bg-ocean-800/40 border-transparent'
+                    : 'hover:bg-ocean-800/40 border-transparent',
                 )}
               >
                 {isPlayingThisHour && (

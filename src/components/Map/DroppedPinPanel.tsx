@@ -133,8 +133,8 @@ export default function DroppedPinPanel() {
   const showGeneral = !showWind && !ctx.sstActive && !ctx.currentsActive
 
   return (
-    <div className="absolute top-14 left-14 right-auto z-20 animate-fade-in max-w-[calc(100vw-8rem)]">
-      <div className="glass rounded-2xl shadow-2xl overflow-hidden overflow-y-auto w-full md:w-72 max-h-[calc(100vh-8rem)]">
+    <div className="absolute top-14 left-3 z-10 animate-fade-in w-72 max-w-[min(18rem,calc(100vw-9rem))] pointer-events-auto">
+      <div className="glass rounded-2xl shadow-2xl overflow-hidden overflow-y-auto max-h-[calc(100vh-8rem)]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-ocean-700">
           <div className="flex items-center gap-2">
@@ -221,8 +221,7 @@ export default function DroppedPinPanel() {
                 <svg width="12" height="12" viewBox="0 0 10 10" style={{ transform: `rotate(${effectiveCurrent.windDirection + 180}deg)` }}>
                   <polygon points="5,0 3,8 5,6 7,8" fill="#06b6d4" />
                 </svg>
-                <span className="text-xs font-semibold text-slate-200 font-mono">{Math.round(mphToKnots(effectiveCurrent.windSpeed))}</span>
-                <span className="text-[10px] text-slate-500">kt</span>
+                <span className="text-xs font-semibold text-slate-200 font-mono">{Math.round(mphToKnots(effectiveCurrent.windSpeed))} kt {degreesToCardinal(effectiveCurrent.windDirection)}</span>
                 {effectiveCurrent.windGusts > effectiveCurrent.windSpeed + 5 && (
                   <span className="text-[10px] text-amber-400 font-mono">G{Math.round(mphToKnots(effectiveCurrent.windGusts))}</span>
                 )}

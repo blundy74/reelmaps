@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cn } from '../../lib/utils'
+import { useMapStore } from '../../store/mapStore'
 
 interface SearchBarProps {
   onSelect: (lat: number, lng: number, label: string) => void
@@ -71,6 +72,16 @@ export default function SearchBar({ onSelect }: SearchBarProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchLabel = useMapStore((s) => s.searchLabel)
+  const setSearchLabel = useMapStore((s) => s.setSearchLabel)
+
+  useEffect(() => {
+    setQuery(searchLabel)
+    if (!searchLabel) {
+      setResults([])
+      setShowDropdown(false)
+    }
+  }, [searchLabel])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -145,6 +156,7 @@ export default function SearchBar({ onSelect }: SearchBarProps) {
   const handleChange = useCallback(
     (value: string) => {
       setQuery(value)
+      setSearchLabel(value)
       if (debounceRef.current) clearTimeout(debounceRef.current)
       if (!value.trim()) {
         setResults([])
@@ -153,7 +165,7 @@ export default function SearchBar({ onSelect }: SearchBarProps) {
       }
       debounceRef.current = setTimeout(() => geocode(value), 400)
     },
-    [geocode],
+    [geocode, setSearchLabel],
   )
 
   // Cleanup on unmount
@@ -167,6 +179,7 @@ export default function SearchBar({ onSelect }: SearchBarProps) {
   function selectResult(result: SearchResult) {
     onSelect(result.lat, result.lng, result.label)
     setQuery(result.label)
+    setSearchLabel(result.label)
     setShowDropdown(false)
     setFocusedIndex(-1)
   }
@@ -186,6 +199,7 @@ export default function SearchBar({ onSelect }: SearchBarProps) {
           const label = `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`
           onSelect(coords.lat, coords.lng, label)
           setQuery(label)
+          setSearchLabel(label)
           setShowDropdown(false)
         }
       }
@@ -210,6 +224,7 @@ export default function SearchBar({ onSelect }: SearchBarProps) {
 
   function clearSearch() {
     setQuery('')
+    setSearchLabel('')
     setResults([])
     setShowDropdown(false)
     setFocusedIndex(-1)

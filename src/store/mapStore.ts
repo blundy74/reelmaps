@@ -150,12 +150,26 @@ interface MapState {
   /** Hotspot tiles missing for the current date/view. */
   hotspotEmpty: boolean
 
+  /** Search box text — cleared on fly-to / hash so it does not stay "Orange Beach". */
+  searchLabel: string
+
+  /** Click-water SST readout (not persisted). */
+  sstReadout: {
+    lat: number
+    lng: number
+    tempF: number | null
+    depthFt: number | null
+    pending: boolean
+  } | null
+
   // Actions
   setViewState: (vs: Partial<MapState['viewState']>) => void
   setLayerLoading: (id: string, loading: boolean) => void
   setSshMeta: (stamp: string | null, source: 'erddap' | 'gibs' | null) => void
   setSstEmpty: (empty: boolean) => void
   setHotspotEmpty: (empty: boolean) => void
+  setSearchLabel: (label: string) => void
+  setSstReadout: (readout: MapState['sstReadout']) => void
   toggleLayer: (id: string) => void
   setLayerVisible: (id: string, visible: boolean) => void
   selectImagery: (id: string) => void
@@ -211,12 +225,16 @@ export const useMapStore = create<MapState>()(
       sshSource: null,
       sstEmpty: false,
       hotspotEmpty: false,
+      searchLabel: '',
+      sstReadout: null,
 
       setViewState: (vs) =>
         set((state) => ({ viewState: { ...state.viewState, ...vs } })),
 
       setSstEmpty: (empty) => set({ sstEmpty: empty }),
       setHotspotEmpty: (empty) => set({ hotspotEmpty: empty }),
+      setSearchLabel: (label) => set({ searchLabel: label }),
+      setSstReadout: (readout) => set({ sstReadout: readout }),
 
       setLayerLoading: (id, loading) =>
         set((state) => {
@@ -269,7 +287,7 @@ export const useMapStore = create<MapState>()(
     }),
     {
       name: 'reelmaps-map-state',
-      version: 16,
+      version: 17,
       migrate: (persisted, version) => {
         const state = persisted as {
           layers?: MapLayer[]
@@ -304,6 +322,10 @@ export const useMapStore = create<MapState>()(
         let viewState = state.viewState ?? { ...GULF_HOME }
         if (version < 16 && isGenericHomeView(viewState)) {
           viewState = { ...GULF_HOME }
+        }
+        // v17: drop stale Fit windows (Keys range over Orange Beach) and old gom clip.
+        if (version < 17) {
+          sstRange = DEFAULT_SST_RANGE
         }
         return {
           layers,

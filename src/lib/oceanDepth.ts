@@ -22,5 +22,5 @@ export async function fetchDepthFeet(lat: number, lng: number): Promise<number |
 }
 
 export function formatDepthFeet(ft: number): string {
-  return `Depth ${ft.toLocaleString()}'`
+  return `Depth ${ft.toLocaleString()} ft`
 }

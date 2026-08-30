@@ -1,5 +1,9 @@
-/** Cheap display cleanup — imported names like CAPT--CARL-RAFFI. */
+/** Display cleanup for imported names like CAPT--CARL-RAFFI. */
 
 export function displaySpotName(name: string): string {
-  return name.replace(/--+/g, '-')
+  return name
+    .replace(/[_]+/g, ' ')
+    .replace(/-+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }

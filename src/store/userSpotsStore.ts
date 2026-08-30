@@ -7,6 +7,7 @@ import { create } from 'zustand'
 import type { SavedSpot, ImportBatch } from '../lib/apiClient'
 import { getSpots, saveSpot, importSpots, getImportBatches, deleteImportBatch, deleteSpot, updateSpot as apiUpdateSpot } from '../lib/apiClient'
 import type { ParsedSpot, FileType } from '../lib/fileParser'
+import { displaySpotName } from '../lib/spotDisplay'
 
 interface UserSpotsState {
   spots: SavedSpot[]
@@ -111,7 +112,7 @@ export function userSpotsToGeoJSON(spots: SavedSpot[]): GeoJSON.FeatureCollectio
       geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
       properties: {
         id: s.id,
-        name: s.name,
+        name: displaySpotName(s.name),
         depthFt: s.depthFt,
         spotType: s.spotType,
         species: s.species,

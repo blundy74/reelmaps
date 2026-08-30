@@ -159,9 +159,14 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     const cw = canvas.width / (window.devicePixelRatio || 1)
     const ch = canvas.height / (window.devicePixelRatio || 1)
     ctx.clearRect(0, 0, cw, ch)
-    if (!visible || !grid) return
-    // Do not paint a regular grid on land while the mask is still building.
-    if (!landMaskRef.current) return
+    if (!visible) {
+      if (harborHintRef.current) {
+        harborHintRef.current = false
+        setHarborHint(false)
+      }
+      return
+    }
+    if (!grid || !landMaskRef.current) return
 
     const zoom = map.getZoom()
     const spacing = oscarLod(zoom).spacingPx
@@ -183,9 +188,10 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     }
     // Harbor / high zoom: OSCAR is ~0.25° — a slack tick grid is fake.
     const sparse = zoom >= 8.5 && flowing === 0
-    if (sparse !== harborHintRef.current) {
-      harborHintRef.current = sparse
-      setHarborHint(sparse)
+    const showHint = flowing === 0
+    if (showHint !== harborHintRef.current) {
+      harborHintRef.current = showHint
+      setHarborHint(showHint)
     }
     if (!sparse) {
       for (const s of samples) {
@@ -228,6 +234,9 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
       if (result) {
         gridRef.current = result
         render()
+      } else if (map.getZoom() >= 8) {
+        harborHintRef.current = true
+        setHarborHint(true)
       }
     } catch {
       if (controller.signal.aborted) return

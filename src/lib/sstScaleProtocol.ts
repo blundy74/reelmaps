@@ -8,6 +8,7 @@
 
 import maplibregl from 'maplibre-gl'
 import { parseSstScaleUrl, recolorSstPixel } from './sstPalette'
+import { eraseLandFromTile, parseWmsBbox3857 } from './landMask'
 
 let registered = false
 
@@ -40,6 +41,15 @@ export function registerSstScaleProtocol(): void {
       px[i + 1] = c.g
       px[i + 2] = c.b
       px[i + 3] = c.a
+    }
+
+    const bbox = parseWmsBbox3857(parsed.httpsUrl)
+    if (bbox) {
+      try {
+        await eraseLandFromTile(imageData, bbox)
+      } catch {
+        /* land mask optional — keep rematched water */
+      }
     }
 
     ctx.putImageData(imageData, 0, 0)

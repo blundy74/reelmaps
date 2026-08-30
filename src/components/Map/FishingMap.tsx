@@ -31,6 +31,7 @@ import { registerContourProtocol } from '../../lib/contourTileProtocol'
 import { registerSstScaleProtocol } from '../../lib/sstScaleProtocol'
 import { activeSstLayerId, sampleSstAtPoint } from '../../lib/sstPalette'
 import { fetchDepthFeet, formatDepthFeet } from '../../lib/oceanDepth'
+import { displaySpotName } from '../../lib/spotDisplay'
 import { useSstAutoFit } from '../../hooks/useSstAutoFit'
 import { useAuthStore } from '../../store/authStore'
 import {
@@ -134,6 +135,9 @@ export default function FishingMap() {
     sstEmpty,
     hotspotEmpty,
     selectedSpot,
+    sstReadout,
+    setSstReadout,
+    setSearchLabel,
   } = useMapStore()
   const sstTilesKeyRef = useRef<Record<string, string>>({})
   const homeAppliedRef = useRef(false)
@@ -554,11 +558,18 @@ export default function FishingMap() {
             }
           }
         } else if (RASTER_LAYERS.has(layerId)) {
+          const isSst = layerId === 'sst-mur' || layerId === 'sst-goes'
+          if (isSst && sstEmpty) {
+            if (map.getLayer(layerId)) map.removeLayer(layerId)
+            if (map.getSource(`${layerId}-source`)) map.removeSource(`${layerId}-source`)
+            delete sstTilesKeyRef.current[layerId]
+            continue
+          }
+
           const tiles = tilesForLayer(layerId, selectedDate, sstRange)
           if (!tiles.length) continue
 
           const nextKey = tiles.join('|')
-          const isSst = layerId === 'sst-mur' || layerId === 'sst-goes'
           const scaleChanged = isSst && sstTilesKeyRef.current[layerId] !== nextKey
           if (scaleChanged && map.getSource(`${layerId}-source`)) {
             if (map.getLayer(layerId)) map.removeLayer(layerId)
@@ -590,7 +601,7 @@ export default function FishingMap() {
         if (map.getLayer(id)) map.moveLayer(id)
       }
     },
-    [getLayer, selectedDate, sstRange, addRasterLayer, addFishingSpotsLayer],
+    [getLayer, selectedDate, sstRange, sstEmpty, addRasterLayer, addFishingSpotsLayer],
   )
 
   // ── Drop / move the draggable coordinate pin ────────────────────────────
@@ -828,27 +839,44 @@ export default function FishingMap() {
           sstPopupRef.current.remove()
           sstPopupRef.current = null
         }
-        if (!sstId || store.sstEmpty) return
+        if (!sstId) {
+          store.setSstReadout(null)
+          return
+        }
+        if (store.sstEmpty) {
+          store.setSstReadout(null)
+          return
+        }
 
         const lat = e.lngLat.lat
         const lng = e.lngLat.lng
         const date = store.selectedDate
+        store.setSstReadout({ lat, lng, tempF: null, depthFt: null, pending: true })
         void (async () => {
           const [tempF, depthFt] = await Promise.all([
             sampleSstAtPoint(sstId, date, lat, lng),
             fetchDepthFeet(lat, lng),
           ])
-          if (tempF == null) return
+          const latest = useMapStore.getState().sstReadout
+          if (!latest || latest.lat !== lat || latest.lng !== lng) return
+          if (tempF == null) {
+            useMapStore.getState().setSstReadout(null)
+            return
+          }
+          useMapStore.getState().setSstReadout({
+            lat, lng, tempF, depthFt, pending: false,
+          })
           const html = [
             `<div style="padding:8px 28px 8px 10px;font:600 13px/1.3 Inter,system-ui,sans-serif;color:#e2e8f0">`,
             `${tempF.toFixed(1)}°F`,
+            `<div style="font:500 10px/1.3 Inter,system-ui,sans-serif;color:#94a3b8;margin-top:3px">${lat.toFixed(4)}°, ${lng.toFixed(4)}°</div>`,
             depthFt != null ? `<div style="font:500 10px/1.3 Inter,system-ui,sans-serif;color:#67e8f9;margin-top:3px">${formatDepthFeet(depthFt)}</div>` : '',
             `</div>`,
           ].join('')
           const popup = new maplibregl.Popup({
             closeButton: true,
             closeOnClick: false,
-            maxWidth: '160px',
+            maxWidth: '200px',
             offset: 10,
             className: 'sst-readout-popup',
           })
@@ -1037,7 +1065,7 @@ export default function FishingMap() {
       cancelled = true
       map.off('style.load', sync)
     }
-  }, [syncLayers, layers, selectedDate])
+  }, [syncLayers, layers, selectedDate, sstEmpty])
 
   // ── User spots layer (imported from CSV/GPX/FIT) ──────────────────────────
   const userSpots = useUserSpotsStore((s) => s.spots)
@@ -1145,7 +1173,7 @@ export default function FishingMap() {
         // Spot name header
         const nameEl = document.createElement('div')
         nameEl.style.cssText = 'color:#e2e8f0;font-size:14px;font-weight:600;margin-bottom:8px;border-bottom:1px solid #1e3a5f;padding-bottom:6px;'
-        nameEl.textContent = props.name || 'Unnamed spot'
+        nameEl.textContent = displaySpotName(props.name || 'Unnamed spot')
         popupEl.appendChild(nameEl)
 
         // Attribute rows
@@ -1280,17 +1308,55 @@ export default function FishingMap() {
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady || !selectedSpot) return
-    openSpotPopup(map, selectedSpot, new maplibregl.LngLat(selectedSpot.lng, selectedSpot.lat))
+    const show = () => {
+      openSpotPopup(map, selectedSpot, new maplibregl.LngLat(selectedSpot.lng, selectedSpot.lat))
+    }
+    show()
+    const onEnd = () => show()
+    map.once('moveend', onEnd)
+    return () => { map.off('moveend', onEnd) }
     // openSpotPopup is stable enough for inspect-from-list
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSpot?.id, mapReady])
+
+  // Paste / deep-link hash must move the live camera (replaceState from us does not fire this).
+  useEffect(() => {
+    if (!mapReady) return
+    const onHash = () => {
+      const map = mapRef.current
+      if (!map) return
+      const urlState = parseUrlState()
+      if (!urlState || !isExplicitShareView({
+        latitude: urlState.lat,
+        longitude: urlState.lng,
+        zoom: urlState.zoom,
+      })) return
+      const cur = map.getCenter()
+      const same =
+        Math.abs(cur.lat - urlState.lat) < 0.00008
+        && Math.abs(cur.lng - urlState.lng) < 0.00008
+        && Math.abs(map.getZoom() - urlState.zoom) < 0.08
+      if (same) return
+      map.jumpTo({ center: [urlState.lng, urlState.lat], zoom: urlState.zoom })
+      useMapStore.getState().setViewState({
+        latitude: urlState.lat,
+        longitude: urlState.lng,
+        zoom: urlState.zoom,
+      })
+      setSearchLabel('')
+      if (urlState.basemap) useMapStore.getState().setBasemap(urlState.basemap)
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [mapReady, setSearchLabel])
 
   useEffect(() => {
     if (sstEmpty || !activeSstLayerId(layers)) {
       sstPopupRef.current?.remove()
       sstPopupRef.current = null
+      setSstReadout(null)
     }
-  }, [sstEmpty, layers])
+  }, [sstEmpty, layers, setSstReadout])
 
   const user = useAuthStore((s) => s.user)
   const spotsFetched = useUserSpotsStore((s) => s.fetched)
@@ -1347,6 +1413,18 @@ export default function FishingMap() {
       {hotspotEmpty && getLayer('hotspot')?.visible && (
         <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-lg bg-black/70 border border-amber-400/40 text-amber-200 text-[12px] font-medium shadow-lg pointer-events-none">
           No hotspot tiles for this view/date
+        </div>
+      )}
+      {sstReadout && (
+        <div className="absolute top-[72px] left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-lg bg-ocean-900/90 border border-cyan-400/40 text-slate-100 text-[13px] font-semibold shadow-lg pointer-events-none">
+          {sstReadout.pending
+            ? 'Reading SST…'
+            : sstReadout.tempF != null
+              ? `${sstReadout.tempF.toFixed(1)}°F`
+              : 'No SST at this point'}
+          <div className="text-[10px] font-medium text-slate-400 font-mono mt-0.5">
+            {sstReadout.lat.toFixed(4)}°, {sstReadout.lng.toFixed(4)}°
+          </div>
         </div>
       )}
       <RadarOverlay mapRef={mapRef} mapReady={mapReady} />
