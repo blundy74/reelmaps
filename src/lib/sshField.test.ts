@@ -11,9 +11,10 @@ function assert(cond: unknown, msg: string): asserts cond {
 
 function main() {
   assert(SSH_INTERVAL_M === 0.10, '10 cm interval')
-  assert(SSH_FAT_M === 0.17, 'Leben 17 cm is the fat contour')
-  assert(!SSH_CONTOUR_LEVELS.includes(0.05 as never) && !SSH_CONTOUR_LEVELS.includes(-0.05 as never), 'no ±5 cm')
-  assert(!SSH_CONTOUR_LEVELS.includes(0 as never), '0 is optional thin, not in 10 cm set')
+  assert(SSH_FAT_M === 0, 'fat contour is SLA 0 (FishTrack eddy wall)')
+  assert(!SSH_CONTOUR_LEVELS.includes(0.17 as never) && !SSH_CONTOUR_LEVELS.includes(0.05 as never), 'no 17 cm or ±5 cm')
+  assert(!SSH_CONTOUR_LEVELS.includes(-0.05 as never), 'no −5 cm')
+  assert(!SSH_CONTOUR_LEVELS.includes(0 as never), '0 is fat, not in the 10 cm set')
   assert(SSH_CONTOUR_LEVELS.every((l) => Math.abs(l * 100) % 10 === 0), '10 cm only')
   assert(sshAgeStamp('2026-03-25T00:00:00Z') === 'SSH 25 Mar 2026', sshAgeStamp('2026-03-25T00:00:00Z'))
   assert(!sshAgeStamp('2026-03-25').includes('2026-03-25T'), 'no ISO dump')
@@ -22,12 +23,14 @@ function main() {
   const w = 3
   const h = 3
   const g = new Float32Array([
-    0.05, 0.05, 0.05,
-    0.05, 0.30, 0.05,
-    0.05, 0.05, 0.05,
+    -0.05, -0.05, -0.05,
+    -0.05, 0.30, -0.05,
+    -0.05, -0.05, -0.05,
   ])
   const fat = isolineSegments(g, w, h, SSH_FAT_M)
-  assert(fat.length > 0, '17 cm closes around a warm core')
+  assert(fat.length > 0, '0 anomaly closes around a warm core')
+  const seventeen = isolineSegments(g, w, h, 0.17)
+  assert(seventeen.length >= 0, '17 cm still computable but is not a chart level')
   const five = isolineSegments(g, w, h, 0.05)
   assert(five.length >= 0, '±5 still computable but not in the chart set')
 
