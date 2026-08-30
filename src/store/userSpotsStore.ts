@@ -12,6 +12,7 @@ interface UserSpotsState {
   spots: SavedSpot[]
   batches: ImportBatch[]
   loading: boolean
+  fetched: boolean
   error: string | null
 
   fetchSpots: () => Promise<void>
@@ -27,14 +28,16 @@ export const useUserSpotsStore = create<UserSpotsState>()((set, get) => ({
   spots: [],
   batches: [],
   loading: false,
+  fetched: false,
   error: null,
 
   fetchSpots: async () => {
+    set({ loading: true })
     try {
       const spots = await getSpots()
-      set({ spots })
+      set({ spots, loading: false, fetched: true })
     } catch (err: any) {
-      set({ error: err.message })
+      set({ error: err.message, loading: false, fetched: true })
     }
   },
 

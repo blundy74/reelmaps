@@ -17,7 +17,10 @@ export const SST_GOM_MIN_F = 78
 export const SST_GOM_MAX_F = 86
 export const SST_WIDE_MIN_F = 50
 export const SST_WIDE_MAX_F = 90
-export const SST_MIN_SPAN_F = 2
+/** Minimum fishing window — tight enough that 1°F Gulf structure still paints. */
+export const SST_MIN_SPAN_F = 1.5
+/** Cap so a mixed-basin view cannot crush the Gulf to one red. */
+export const SST_MAX_FIT_SPAN_F = 5
 
 export type SstRangePreset = 'gom' | 'wide' | 'fit'
 
@@ -195,9 +198,16 @@ function percentile(sorted: number[], p: number): number {
 export function spanFromTempsF(tempsF: number[]): { minF: number; maxF: number } | null {
   if (tempsF.length < 40) return null
   const sorted = [...tempsF].sort((a, b) => a - b)
-  let minF = percentile(sorted, 0.05)
-  let maxF = percentile(sorted, 0.95)
+  // Inner percentiles (not p5–p95): late-August Gulf is 86–89. A 80–88.5
+  // window paints the whole basin one red and hides 1°F rips.
+  let minF = percentile(sorted, 0.15)
+  let maxF = percentile(sorted, 0.85)
   if (!Number.isFinite(minF) || !Number.isFinite(maxF)) return null
+  if (maxF - minF > SST_MAX_FIT_SPAN_F) {
+    const mid = percentile(sorted, 0.5)
+    minF = mid - SST_MAX_FIT_SPAN_F / 2
+    maxF = mid + SST_MAX_FIT_SPAN_F / 2
+  }
   if (maxF - minF < SST_MIN_SPAN_F) {
     const mid = (minF + maxF) / 2
     minF = mid - SST_MIN_SPAN_F / 2

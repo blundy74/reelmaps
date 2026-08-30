@@ -6,6 +6,7 @@ import { Tooltip } from '../ui/Tooltip'
 import type { MapLayer } from '../../types'
 import { cn } from '../../lib/utils'
 import { OSCAR_AGE_STAMP } from '../../lib/oscarCurrents'
+import { isImageryLayerId } from '../../lib/imageryLayers'
 
 type LayerGroup = MapLayer['group']
 
@@ -62,14 +63,14 @@ function LayerRow({ layer, onToggle, onOpacity }: LayerRowProps) {
   return (
     <div className={cn('rounded-lg overflow-hidden transition-colors', layer.visible ? 'bg-ocean-750/80' : 'bg-transparent')}>
       <div
-        className="layer-row flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer"
+        className="layer-row flex items-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg cursor-pointer"
         onClick={() => setExpanded((e) => !e)}
       >
         {/* Toggle switch */}
         <Switch
           checked={layer.visible}
           onCheckedChange={() => onToggle(layer.id)}
-          size="sm"
+          size="md"
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
         />
 
@@ -80,7 +81,7 @@ function LayerRow({ layer, onToggle, onOpacity }: LayerRowProps) {
             layer.visible ? 'text-slate-200' : 'text-slate-500',
           )}
         >
-          <span className="block truncate">{layer.name}</span>
+          <span className="block leading-snug break-words">{layer.name}</span>
           {layer.id === 'current-arrows' && (
             <span
               className={cn(
@@ -267,19 +268,19 @@ function BasemapSelector() {
 // ── Main LayerPanel ───────────────────────────────────────────────────────────
 
 export default function LayerPanel() {
-  const { layers, toggleLayer, setLayerOpacity, setSelectedDate } = useMapStore()
+  const { layers, toggleLayer, selectImagery, setLayerOpacity, hotspotEmpty, sstEmpty } = useMapStore()
 
   const handleToggle = (id: string) => {
-    toggleLayer(id)
-    if (id === 'hotspot') {
-      const hotspot = layers.find((l) => l.id === 'hotspot')
-      // hotspot.visible is the CURRENT state before toggle, so !visible = new state
-      const turningOn = !hotspot?.visible
-      const today = new Date().toISOString().split('T')[0]
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
-      setSelectedDate(turningOn ? today : yesterday)
+    // Imagery chips are a radio group — left rail stays in sync.
+    if (isImageryLayerId(id)) {
+      selectImagery(id)
+      return
     }
+    toggleLayer(id)
   }
+
+  const hotspotOn = layers.find((l) => l.id === 'hotspot')?.visible ?? false
+  const sstOn = layers.some((l) => (l.id === 'sst-mur' || l.id === 'sst-goes') && l.visible)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -305,6 +306,16 @@ export default function LayerPanel() {
               />
             )
           })}
+          {sstOn && sstEmpty && (
+            <p className="text-[11px] text-amber-300/90 px-3 pt-1">
+              No SST for this date
+            </p>
+          )}
+          {hotspotOn && hotspotEmpty && (
+            <p className="text-[11px] text-amber-300/90 px-3 pt-1">
+              No hotspots for this date / view
+            </p>
+          )}
         </div>
       </div>
 

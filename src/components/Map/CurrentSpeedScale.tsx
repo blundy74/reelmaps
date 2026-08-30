@@ -27,8 +27,8 @@ export default function CurrentSpeedScale({ visible }: { visible: boolean }) {
 
   return (
     <div
-      className="absolute right-3 z-20 pointer-events-none flex flex-col items-end gap-1.5"
-      style={{ bottom: '5.5rem' }}
+      className="absolute z-20 pointer-events-none flex flex-col items-end gap-1.5"
+      style={{ right: '3.75rem', bottom: '6.5rem' }}
       aria-label={`Current speed 0 to 4 knots · ${OSCAR_AGE_STAMP}`}
     >
       <span

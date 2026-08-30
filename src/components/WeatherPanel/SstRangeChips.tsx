@@ -11,7 +11,6 @@ import { useState, type ReactNode } from 'react'
 import { useMapStore } from '../../store/mapStore'
 import { cn } from '../../lib/utils'
 import {
-  DEFAULT_SST_RANGE,
   SST_GOM_MAX_F,
   SST_GOM_MIN_F,
   SST_WIDE_MAX_F,
@@ -63,11 +62,6 @@ export default function SstRangeChips() {
 
   const handleFitChip = async () => {
     setFitError(null)
-    // Do not copy Loop/sail 78–86 onto the Fit chip — that looks like a no-op.
-    if (sstRange.preset !== 'fit') {
-      setSstRange(DEFAULT_SST_RANGE)
-      return
-    }
     if (!mapBounds) return
     setFitting(true)
     try {
@@ -126,7 +120,7 @@ export default function SstRangeChips() {
         </Chip>
       </div>
       <p className="text-[9px] text-slate-600 mt-1 px-0.5 leading-snug">
-        Fit is the default — p5–p95 of water in view. Date scrub keeps this window; tap Fit to re-sample.
+        Fit is the default — inner percentiles of water in view so 1°F rips paint. Date scrub keeps this window; tap Fit to re-sample.
         Loop / sail locks 78–86. Wide is the global rainbow.
       </p>
       {fitError && (

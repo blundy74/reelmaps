@@ -18,7 +18,7 @@ import { cn } from '../../lib/utils'
 import type { HourlyEntry, MarineHourlyEntry } from '../../lib/weatherTypes'
 
 const COL_W = 36
-const LABEL_W = 52
+const LABEL_W = 72
 
 interface Col {
   entry: HourlyEntry
@@ -121,7 +121,7 @@ function Cell({
 function Label({ children }: { children: ReactNode }) {
   return (
     <div
-      className="sticky left-0 z-10 flex items-center text-[9px] text-slate-500 uppercase tracking-wide px-1 bg-ocean-900/95 border-r border-white/5 flex-shrink-0"
+      className="sticky left-0 z-10 flex items-center text-[9px] text-slate-500 uppercase tracking-tight px-1.5 pr-2 bg-ocean-900/95 border-r border-white/10 flex-shrink-0"
       style={{ width: LABEL_W }}
     >
       {children}

@@ -58,6 +58,17 @@ export default function MeasureTool({ mapRef }: Props) {
     setPanelData(null)
   }, [mapRef])
 
+  useEffect(() => {
+    if (!measureMode) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      clearMeasurement()
+      useMapStore.getState().setMeasureMode(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [measureMode, clearMeasurement])
+
   // ---------------------------------------------------------------------------
   // Update the GeoJSON line on the map
   // ---------------------------------------------------------------------------
@@ -221,38 +232,58 @@ export default function MeasureTool({ mapRef }: Props) {
   // Floating results panel
   // ---------------------------------------------------------------------------
 
-  if (!panelData) return null
+  if (!measureMode && !panelData) return null
 
-  const totalNM = panelData.totalNM
+  const totalNM = panelData?.totalNM ?? 0
   const totalSM = totalNM * NM_TO_SM
   const totalKM = totalNM * NM_TO_KM
 
   return (
-    <div className="absolute top-16 right-3 z-40 glass border border-ocean-600 rounded-xl p-3 text-xs text-slate-200 shadow-lg min-w-[180px] animate-fade-in">
-      <div className="font-semibold text-cyan-400 mb-2">Distance</div>
-      <div className="space-y-1">
-        <div className="flex justify-between">
-          <span className="text-slate-400">Nautical mi</span>
-          <span className="font-mono">{totalNM.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-slate-400">Statute mi</span>
-          <span className="font-mono">{totalSM.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-slate-400">Kilometers</span>
-          <span className="font-mono">{totalKM.toFixed(2)}</span>
-        </div>
-      </div>
-      <button
-        onClick={() => {
-          clearMeasurement()
-          useMapStore.getState().setMeasureMode(false)
-        }}
-        className="mt-3 w-full py-1.5 rounded-lg bg-ocean-800 hover:bg-ocean-700 text-slate-300 text-xs font-medium transition-colors border border-ocean-600"
-      >
-        Clear
-      </button>
+    <div className="absolute top-16 left-3 right-16 md:left-auto md:right-36 z-40 glass border border-ocean-600 rounded-xl p-3 text-xs text-slate-200 shadow-lg min-w-[180px] max-w-sm animate-fade-in">
+      {measureMode && (
+        <p className="text-[11px] text-cyan-200 mb-2 leading-snug">
+          Click the map to drop measure points. Double-click to finish. Esc cancels.
+        </p>
+      )}
+      {!panelData && measureMode && (
+        <button
+          onClick={() => {
+            clearMeasurement()
+            useMapStore.getState().setMeasureMode(false)
+          }}
+          className="w-full py-1.5 rounded-lg bg-ocean-800 hover:bg-ocean-700 text-slate-300 text-xs font-medium transition-colors border border-ocean-600"
+        >
+          Cancel
+        </button>
+      )}
+      {panelData && (
+        <>
+          <div className="font-semibold text-cyan-400 mb-2">Distance</div>
+          <div className="space-y-1">
+            <div className="flex justify-between">
+              <span className="text-slate-400">Nautical mi</span>
+              <span className="font-mono">{totalNM.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Statute mi</span>
+              <span className="font-mono">{totalSM.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Kilometers</span>
+              <span className="font-mono">{totalKM.toFixed(2)}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              clearMeasurement()
+              useMapStore.getState().setMeasureMode(false)
+            }}
+            className="mt-3 w-full py-1.5 rounded-lg bg-ocean-800 hover:bg-ocean-700 text-slate-300 text-xs font-medium transition-colors border border-ocean-600"
+          >
+            Clear
+          </button>
+        </>
+      )}
     </div>
   )
 }

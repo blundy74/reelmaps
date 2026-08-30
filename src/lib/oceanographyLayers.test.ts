@@ -37,6 +37,7 @@ function main() {
   assert(SSH_FAT_M === 0, 'fat contour stays SLA 0')
   assert(OSCAR_AGE_STAMP === 'OSCAR 17 Jul 2024', `OSCAR stamp ${OSCAR_AGE_STAMP}`)
   assert(OSCAR_SLACK_KT === 0.45, 'slack heads-only threshold unchanged')
+  assert(byId['sst-mur'].name === 'Sea Surface Temp', 'SST row is Sea Surface Temp')
 
   console.log('oceanographyLayers.test.ts: ok')
 }

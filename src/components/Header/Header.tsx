@@ -374,7 +374,7 @@ function UserButton({ user, onLogout }: {
 }
 
 export default function Header({ onSettingsClick }: HeaderProps) {
-  const { cursorCoords, sidebarOpen, setSidebarOpen } = useMapStore()
+  const { viewState, sidebarOpen, setSidebarOpen } = useMapStore()
   const { panelOpen: weatherOpen, setPanelOpen: setWeatherOpen } = useWeatherStore()
   const { user, setShowAuthModal, logout } = useAuthStore()
   const setFlyToTarget = useMapStore((s) => s.setFlyToTarget)
@@ -419,19 +419,20 @@ export default function Header({ onSettingsClick }: HeaderProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
           <span className="text-xs font-mono text-slate-400 tabular-nums">
-            {cursorCoords
-              ? formatCoords(cursorCoords.lat, cursorCoords.lng)
-              : '—'}
+            {formatCoords(viewState.latitude, viewState.longitude)}
           </span>
         </div>
 
-        {/* Live data indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500">
+        {/* Weather/radar are live. OSCAR / SSH stamps stay on those layers. */}
+        <div
+          className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500"
+          title="Weather and radar are live. Currents (OSCAR) and SSH are archive fields — see their age stamps."
+        >
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-40" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
           </span>
-          <span>NOAA Live</span>
+          <span>Weather live</span>
         </div>
 
         {/* Settings gear */}

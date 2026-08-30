@@ -170,15 +170,15 @@ export function marineFromWaveGrid(grid: WaveGrid, lat: number, lng: number): Ma
       waveHeight: M_TO_FT(s.heightM),
       waveDirection: s.direction,
       wavePeriod: s.period,
-      windWaveHeight: 0,
-      windWaveDirection: 0,
-      windWavePeriod: 0,
-      swellHeight: 0,
-      swellDirection: 0,
+      windWaveHeight: null,
+      windWaveDirection: null,
+      windWavePeriod: null,
+      swellHeight: null,
+      swellDirection: null,
       swellPeriod: s.swellPeriod,
-      oceanCurrentSpeed: 0,
-      oceanCurrentDirection: 0,
-      seaSurfaceTemp: 0,
+      oceanCurrentSpeed: null,
+      oceanCurrentDirection: null,
+      seaSurfaceTemp: null,
     }
   })
   return { hourly }
