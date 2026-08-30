@@ -20,6 +20,18 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/proxy\/erddap/, '/erddap'),
       },
+      '/proxy/realearth': {
+        target: 'https://realearth.ssec.wisc.edu',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/proxy\/realearth/, ''),
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('referer')
+            proxyReq.removeHeader('origin')
+            proxyReq.removeHeader('cookie')
+          })
+        },
+      },
     },
   },
 })

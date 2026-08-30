@@ -1,17 +1,31 @@
 /**
- * LightningOverlay — three-layer lightning visualization:
+ * LightningOverlay — live lightning for the OVERLAYS Lightning chip (`id === 'lightning'`).
  *
- *   1. GIBS GLM density tiles (raster) — background heatmap of recent flash density
- *   2. GLM individual flashes (canvas) — animated white flash bursts from NOAA satellite
- *   3. HRRR forecast — handled by separate HrrrOverlay component
+ *   1. RealEarth GOES-East GLM Flash Extent Density (5-min XYZ) — the visible product
+ *   2. GLM individual flashes (canvas) — only when /glm/flashes returns points
+ *   3. HRRR lightning tiles — fallback if RealEarth fails after a couple of tries
  *
- * Polls the GLM API every 20 seconds for fresh flash coordinates.
- * Each flash renders as a bright white burst that fades over 3 seconds.
+ * Radar does not turn this on. HRRR lightning forecast (`hrrr-lightning`) is a
+ * separate overlay. Do not wait on Lambda; raster FED is the live layer.
  */
 
 import { useEffect, useRef, useCallback } from 'react'
 import type maplibregl from 'maplibre-gl'
-import { useWeatherStore } from '../../store/weatherStore'
+import { useWeatherStore, selectOverlayHour } from '../../store/weatherStore'
+import {
+  GLM_PROBE_FAILS_BEFORE_HRRR,
+  GLM_TILE_REFRESH_MS,
+  glmFlashesFromApi,
+  glmTileCacheBust,
+  hasRealEarthWatermarkHeader,
+  hrrrLightningFallbackUrl,
+  isUsableRasterTile,
+  lightningChipVisible,
+  realEarthGlmFedUrl,
+  realEarthGlmProbeUrl,
+  type LightningProduct,
+} from '../../lib/lightningOverlay'
+import { registerNorefProtocol } from '../../lib/norefTileProtocol'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
@@ -22,21 +36,33 @@ interface Flash {
   lat: number
   lon: number
   energy?: number
-  receivedAt: number // when we received it from the API
+  receivedAt: number
 }
 
-const GIBS_BASE = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best'
 const GLM_SOURCE = 'glm-density-source'
 const GLM_LAYER = 'glm-density-layer'
 const GLM_API = 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com/glm/flashes'
-const FLASH_MAX_AGE = 10000 // 10 seconds visible per flash
-const POLL_INTERVAL = 20000 // 20 seconds
+const FLASH_MAX_AGE = 10000
+const POLL_INTERVAL = 20000
 
-function getGlmTime(): string {
-  const now = new Date()
-  now.setMinutes(now.getMinutes() - 20)
-  now.setMinutes(Math.floor(now.getMinutes() / 10) * 10, 0, 0)
-  return now.toISOString().slice(0, 19) + 'Z'
+async function probeRealEarthImage(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(12000),
+      referrer: 'no-referrer',
+      credentials: 'omit',
+    })
+    if (hasRealEarthWatermarkHeader(res.headers)) return false
+    if (!res.ok) return false
+    const buf = await res.arrayBuffer()
+    return isUsableRasterTile({
+      ok: true,
+      contentType: res.headers.get('content-type'),
+      byteLength: buf.byteLength,
+    })
+  } catch {
+    return false
+  }
 }
 
 export default function LightningOverlay({ mapRef, mapReady }: Props) {
@@ -44,19 +70,26 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
   const flashesRef = useRef<Flash[]>([])
   const animRef = useRef<number>(0)
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null)
-  const lastGibsTime = useRef('')
+  const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastTileUrl = useRef('')
+  const productRef = useRef<LightningProduct>('glm')
+  const failCount = useRef(0)
+  const probing = useRef(false)
 
-  const lightningToggle = useWeatherStore(
-    (s) => s.overlays.find((o) => o.id === 'lightning')?.visible ?? false,
-  )
-  const radarVisible = useWeatherStore(
-    (s) => s.overlays.find((o) => o.id === 'radar')?.visible ?? false,
-  )
-  const lightningVisible = lightningToggle || radarVisible
-
+  const lightningVisible = useWeatherStore((s) => lightningChipVisible(s.overlays))
   const opacity = useWeatherStore(
     (s) => s.overlays.find((o) => o.id === 'lightning')?.opacity ?? 0.8,
   )
+  const forecastHour = useWeatherStore(selectOverlayHour)
+  const hourly = useWeatherStore((s) => s.hourly)
+  const setLightningProduct = useWeatherStore((s) => s.setLightningProduct)
+
+  const forecastHourRef = useRef(forecastHour)
+  forecastHourRef.current = forecastHour
+  const hourlyRef = useRef(hourly)
+  hourlyRef.current = hourly
+  const opacityRef = useRef(opacity)
+  opacityRef.current = opacity
 
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current
@@ -72,85 +105,146 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }, [mapRef])
 
-  // Fetch flash data from GLM API
+  const applyTiles = useCallback((tileUrl: string, product: LightningProduct) => {
+    registerNorefProtocol()
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded()) return
+
+    if (!map.getSource(GLM_SOURCE)) {
+      map.addSource(GLM_SOURCE, { type: 'raster', tiles: [tileUrl], tileSize: 256 })
+    }
+    if (!map.getLayer(GLM_LAYER)) {
+      map.addLayer({
+        id: GLM_LAYER,
+        type: 'raster',
+        source: GLM_SOURCE,
+        paint: {
+          'raster-opacity': opacityRef.current,
+          'raster-opacity-transition': { duration: 300, delay: 0 },
+        },
+      })
+      for (const id of ['clusters', 'cluster-count', 'fishing-spots', 'fishing-spots-rigs', 'fishing-spots-labels']) {
+        if (map.getLayer(id)) map.moveLayer(id)
+      }
+    }
+    map.setLayoutProperty(GLM_LAYER, 'visibility', 'visible')
+    map.setPaintProperty(GLM_LAYER, 'raster-opacity', opacityRef.current)
+
+    if (tileUrl !== lastTileUrl.current) {
+      const src = map.getSource(GLM_SOURCE) as maplibregl.RasterTileSource
+      if (src?.setTiles) src.setTiles([tileUrl])
+      lastTileUrl.current = tileUrl
+    }
+
+    if (productRef.current !== product) {
+      productRef.current = product
+      setLightningProduct(product)
+    }
+  }, [mapRef, setLightningProduct])
+
+  const showGlm = useCallback(() => {
+    applyTiles(realEarthGlmFedUrl(glmTileCacheBust()), 'glm')
+  }, [applyTiles])
+
+  const showHrrr = useCallback(async () => {
+    const url = await hrrrLightningFallbackUrl(forecastHourRef.current, hourlyRef.current)
+    if (url) applyTiles(url, 'hrrr')
+    else {
+      productRef.current = 'hrrr'
+      setLightningProduct('hrrr')
+    }
+  }, [applyTiles, setLightningProduct])
+
+  const probeAndPaint = useCallback(async () => {
+    if (probing.current) return
+    probing.current = true
+    try {
+      // Paint GLM first — do not wait on the probe, and do not start on HRRR.
+      showGlm()
+      let ok = false
+      for (let i = 0; i < GLM_PROBE_FAILS_BEFORE_HRRR; i++) {
+        ok = await probeRealEarthImage(realEarthGlmProbeUrl(`${glmTileCacheBust()}-${i}`))
+        if (ok) break
+      }
+      if (ok) {
+        failCount.current = 0
+        showGlm()
+        return
+      }
+      failCount.current = GLM_PROBE_FAILS_BEFORE_HRRR
+      await showHrrr()
+    } finally {
+      probing.current = false
+    }
+  }, [showGlm, showHrrr])
+
   const fetchFlashes = useCallback(async () => {
     try {
       const res = await fetch(GLM_API, { signal: AbortSignal.timeout(10000) })
       if (!res.ok) return
       const data = await res.json()
+      const points = glmFlashesFromApi(data)
+      if (points.length === 0) return
       const now = Date.now()
-
-      if (data.flashes?.length > 0) {
-        // Stagger the receivedAt times so flashes appear to animate in
-        const stagger = POLL_INTERVAL / Math.max(data.flashes.length, 1)
-        const newFlashes: Flash[] = data.flashes.map((f: { lat: number; lon: number; energy?: number }, i: number) => ({
-          lat: f.lat,
-          lon: f.lon,
-          energy: f.energy,
-          receivedAt: now + i * stagger * 0.5, // spread over half the poll interval
-        }))
-        flashesRef.current = [...flashesRef.current.filter(f => now - f.receivedAt < FLASH_MAX_AGE), ...newFlashes]
-      }
-    } catch { /* ignore fetch errors */ }
+      const stagger = POLL_INTERVAL / Math.max(points.length, 1)
+      const newFlashes: Flash[] = points.map((f, i) => ({
+        lat: f.lat,
+        lon: f.lon,
+        energy: f.energy,
+        receivedAt: now + i * stagger * 0.5,
+      }))
+      flashesRef.current = [
+        ...flashesRef.current.filter((f) => now - f.receivedAt < FLASH_MAX_AGE),
+        ...newFlashes,
+      ]
+    } catch { /* ignore fetch errors — raster FED is the visible product */ }
   }, [])
 
   useEffect(() => {
     const map = mapRef.current
-    const canvas = canvasRef.current
-    if (!map || !canvas) return
+    if (!map) return
 
     if (!lightningVisible) {
-      // Hide everything
-      if (map.getLayer(GLM_LAYER)) map.setLayoutProperty(GLM_LAYER, 'visibility', 'none')
-      const ctx = canvas.getContext('2d')
-      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+      // Hide tiles even if the canvas has already unmounted (return null below).
+      try {
+        if (map.getLayer(GLM_LAYER)) map.setLayoutProperty(GLM_LAYER, 'visibility', 'none')
+      } catch { /* style not ready */ }
+      const ctx = canvasRef.current?.getContext('2d')
+      if (ctx && canvasRef.current) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
       flashesRef.current = []
       if (pollTimer.current) clearInterval(pollTimer.current)
+      if (refreshTimer.current) clearInterval(refreshTimer.current)
       cancelAnimationFrame(animRef.current)
+      lastTileUrl.current = ''
+      failCount.current = 0
+      productRef.current = 'glm'
+      setLightningProduct('glm')
       return
     }
 
+    const canvas = canvasRef.current
+    if (!canvas) return
+
     syncSize()
 
-    // ── GIBS GLM density tiles (background) ──────────────────────────
-    const setupGibs = () => {
-      if (!map.isStyleLoaded()) return
-      const time = getGlmTime()
-      const tileUrl = `${GIBS_BASE}/GOES-East_GLM_Flash_Extent_Density/default/${time}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`
+    const run = () => { void probeAndPaint() }
+    if (map.isStyleLoaded()) run()
+    else map.once('style.load', run)
 
-      if (!map.getSource(GLM_SOURCE)) {
-        map.addSource(GLM_SOURCE, { type: 'raster', tiles: [tileUrl], tileSize: 256, maxzoom: 8 })
-      }
-      if (!map.getLayer(GLM_LAYER)) {
-        map.addLayer({
-          id: GLM_LAYER, type: 'raster', source: GLM_SOURCE,
-          paint: { 'raster-opacity': opacity * 0.6, 'raster-opacity-transition': { duration: 300, delay: 0 } },
-        })
-        for (const id of ['clusters', 'cluster-count', 'fishing-spots', 'fishing-spots-rigs', 'fishing-spots-labels']) {
-          if (map.getLayer(id)) map.moveLayer(id)
-        }
-      }
-      map.setLayoutProperty(GLM_LAYER, 'visibility', 'visible')
-      map.setPaintProperty(GLM_LAYER, 'raster-opacity', opacity * 0.6)
-
-      if (time !== lastGibsTime.current) {
-        const src = map.getSource(GLM_SOURCE) as maplibregl.RasterTileSource
-        if (src?.setTiles) src.setTiles([tileUrl])
-        lastGibsTime.current = time
-      }
+    const onStyleLoad = () => {
+      lastTileUrl.current = ''
+      failCount.current = 0
+      setTimeout(run, 50)
     }
-
-    if (map.isStyleLoaded()) setupGibs()
-    else map.once('style.load', setupGibs)
-
-    const onStyleLoad = () => { lastGibsTime.current = ''; setTimeout(setupGibs, 50) }
     map.on('style.load', onStyleLoad)
 
-    // ── GLM flash polling ────────────────────────────────────────────
     fetchFlashes()
     pollTimer.current = setInterval(fetchFlashes, POLL_INTERVAL)
+    refreshTimer.current = setInterval(() => {
+      lastTileUrl.current = ''
+      void probeAndPaint()
+    }, GLM_TILE_REFRESH_MS)
 
-    // ── Canvas animation loop (flash bursts) ─────────────────────────
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
@@ -164,25 +258,20 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
       const ch = container.clientHeight
 
       ctx.clearRect(0, 0, cw, ch)
-
-      // Remove expired flashes
-      flashesRef.current = flashesRef.current.filter(f => now - f.receivedAt < FLASH_MAX_AGE)
+      flashesRef.current = flashesRef.current.filter((f) => now - f.receivedAt < FLASH_MAX_AGE)
 
       for (const flash of flashesRef.current) {
         const age = now - flash.receivedAt
-        if (age < 0) continue // staggered — not yet "visible"
+        if (age < 0) continue
 
         const pt = map.project([flash.lon, flash.lat])
         if (pt.x < -50 || pt.x > cw + 50 || pt.y < -50 || pt.y > ch + 50) continue
 
-        const progress = age / FLASH_MAX_AGE // 0→1
+        const progress = age / FLASH_MAX_AGE
 
-        // ── BRIGHT WHITE FLASH (first 15%) ─────────────────────────
         if (progress < 0.15) {
           const t = progress / 0.15
           const intensity = 1.0 - t
-
-          // Large white burst
           const r = 20 + intensity * 15
           const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, r)
           grad.addColorStop(0, `rgba(255, 255, 255, ${intensity * 0.9})`)
@@ -192,15 +281,12 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
           ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2)
           ctx.fillStyle = grad
           ctx.fill()
-
-          // Bright core
           ctx.beginPath()
           ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2)
           ctx.fillStyle = `rgba(255, 255, 255, ${intensity})`
           ctx.fill()
         }
 
-        // ── EXPANDING RING (first 40%) ─────────────────────────────
         if (progress < 0.4) {
           const t = progress / 0.4
           const ringR = t * 20
@@ -212,7 +298,6 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
           ctx.stroke()
         }
 
-        // ── FADING DOT (always visible while alive) ────────────────
         const dotAlpha = Math.max(0.05, 0.6 * (1 - progress))
         const dotSize = Math.max(1, 2.5 * (1 - progress * 0.5))
         ctx.beginPath()
@@ -235,10 +320,22 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
       map.off('resize', onResize)
       map.off('style.load', onStyleLoad)
       if (pollTimer.current) clearInterval(pollTimer.current)
+      if (refreshTimer.current) clearInterval(refreshTimer.current)
     }
-  }, [mapRef, lightningVisible, opacity, syncSize, fetchFlashes, mapReady])
+  }, [mapRef, lightningVisible, syncSize, fetchFlashes, probeAndPaint, setLightningProduct, mapReady])
 
-  // Cleanup on unmount
+  useEffect(() => {
+    if (!lightningVisible) return
+    if (productRef.current === 'hrrr') {
+      lastTileUrl.current = ''
+      void showHrrr()
+    } else {
+      try {
+        mapRef.current?.setPaintProperty(GLM_LAYER, 'raster-opacity', opacity)
+      } catch { /* layer not mounted yet */ }
+    }
+  }, [lightningVisible, forecastHour, opacity, showHrrr, mapRef])
+
   useEffect(() => {
     return () => {
       const map = mapRef.current
@@ -248,6 +345,7 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
         if (map.getSource(GLM_SOURCE)) map.removeSource(GLM_SOURCE)
       } catch { /* disposed */ }
       if (pollTimer.current) clearInterval(pollTimer.current)
+      if (refreshTimer.current) clearInterval(refreshTimer.current)
     }
   }, [mapRef])
 
