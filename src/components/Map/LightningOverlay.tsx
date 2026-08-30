@@ -204,13 +204,15 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
 
   useEffect(() => {
     const map = mapRef.current
-    const canvas = canvasRef.current
-    if (!map || !canvas) return
+    if (!map) return
 
     if (!lightningVisible) {
-      if (map.getLayer(GLM_LAYER)) map.setLayoutProperty(GLM_LAYER, 'visibility', 'none')
-      const ctx = canvas.getContext('2d')
-      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+      // Hide tiles even if the canvas has already unmounted (return null below).
+      try {
+        if (map.getLayer(GLM_LAYER)) map.setLayoutProperty(GLM_LAYER, 'visibility', 'none')
+      } catch { /* style not ready */ }
+      const ctx = canvasRef.current?.getContext('2d')
+      if (ctx && canvasRef.current) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
       flashesRef.current = []
       if (pollTimer.current) clearInterval(pollTimer.current)
       if (refreshTimer.current) clearInterval(refreshTimer.current)
@@ -221,6 +223,9 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
       setLightningProduct('glm')
       return
     }
+
+    const canvas = canvasRef.current
+    if (!canvas) return
 
     syncSize()
 
