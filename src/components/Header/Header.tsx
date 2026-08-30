@@ -7,6 +7,7 @@ import { formatCoords, cn } from '../../lib/utils'
 import { requestPasswordReset, resendVerificationCode, deactivateAccount, cancelSubscription, createCheckoutSession, createPortalSession } from '../../lib/apiClient'
 import SearchBar from './SearchBar'
 import ContactModal from '../ui/ContactModal'
+import { UA_BUILD } from '../../lib/uaBuild'
 
 interface HeaderProps {
   onSettingsClick?: () => void
@@ -399,7 +400,10 @@ export default function Header({ onSettingsClick }: HeaderProps) {
             </svg>
           </div>
           <div className="text-left">
-            <div className="text-sm font-bold text-slate-100 leading-tight tracking-tight">ReelMaps</div>
+            <div className="flex items-baseline gap-1.5">
+              <div className="text-sm font-bold text-slate-100 leading-tight tracking-tight">ReelMaps</div>
+              <span className="text-[9px] font-mono text-slate-600" title="UA build mark">{UA_BUILD}</span>
+            </div>
             <div className="text-xs text-slate-500 leading-tight hidden sm:block">AI-Powered Fishing Intelligence</div>
           </div>
         </button>

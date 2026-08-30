@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { useMapStore } from '../../store/mapStore'
 import { syncStateToUrl } from '../../lib/urlSync'
+import { SHARE_TOAST_MS, showShareToast } from '../../lib/shareToast'
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -28,12 +28,9 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-const TOAST_MS = 3200
-
 export default function ShareButton() {
   const [copied, setCopied] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
-  const [toastPos, setToastPos] = useState<{ top: number; left: number } | null>(null)
   const timerRef = useRef<number>(0)
 
   useEffect(() => () => window.clearTimeout(timerRef.current), [])
@@ -51,11 +48,13 @@ export default function ShareButton() {
     const el = btnRef.current
     if (el) {
       const r = el.getBoundingClientRect()
-      setToastPos({ top: r.bottom + 8, left: r.left + r.width / 2 })
+      showShareToast({ top: r.bottom + 8, left: r.left + r.width / 2 })
+    } else {
+      showShareToast({ top: 72, left: window.innerWidth / 2 })
     }
     setCopied(true)
     window.clearTimeout(timerRef.current)
-    timerRef.current = window.setTimeout(() => setCopied(false), TOAST_MS)
+    timerRef.current = window.setTimeout(() => setCopied(false), SHARE_TOAST_MS)
   }, [])
 
   return (
@@ -72,17 +71,6 @@ export default function ShareButton() {
         </svg>
         {copied ? 'Copied!' : 'Share'}
       </button>
-
-      {copied && toastPos && createPortal(
-        <div
-          className="fixed px-2.5 py-1 rounded-md bg-cyan-600 text-white text-[11px] font-medium whitespace-nowrap shadow-lg pointer-events-none"
-          style={{ top: toastPos.top, left: toastPos.left, transform: 'translateX(-50%)', zIndex: 80 }}
-          role="status"
-        >
-          Link copied
-        </div>,
-        document.body,
-      )}
     </div>
   )
 }

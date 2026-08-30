@@ -109,8 +109,9 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const setLayerLoading = useMapStore((s) => s.setLayerLoading)
-  const [harborHint, setHarborHint] = useState(false)
-  const harborHintRef = useRef(false)
+  const setCurrentsZoomHint = useMapStore((s) => s.setCurrentsZoomHint)
+  const [harborHint, setHarborHint] = useState(visible)
+  const harborHintRef = useRef(visible)
 
   const syncSize = useCallback(() => {
     const canvas = canvasRef.current
@@ -163,27 +164,29 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
       if (harborHintRef.current) {
         harborHintRef.current = false
         setHarborHint(false)
+        setCurrentsZoomHint(false)
       }
       return
     }
-    if (!grid || !landMaskRef.current) return
 
-    const zoom = map.getZoom()
-    const spacing = oscarLod(zoom).spacingPx
-    const samples: { sx: number; sy: number; angleDeg: number; length: number; slack: boolean }[] = []
     let flowing = 0
-    ctx.globalAlpha = opacity
-    for (let sy = spacing / 2; sy < ch; sy += spacing) {
-      for (let sx = spacing / 2; sx < cw; sx += spacing) {
-        if (isLandPx(sx, sy)) continue
-        const ll = map.unproject([sx, sy])
-        const sample = sampleOscar(grid, ll.lat, ll.lng)
-        if (!sample) continue
-        const slack = sample.speedKt < OSCAR_SLACK_KT
-        if (!slack) flowing++
-        const t = Math.min(sample.speedKt / OSCAR_SPEED_MAX_KT, 1)
-        const len = ARROW_LENGTH_MIN + t * (ARROW_LENGTH_MAX - ARROW_LENGTH_MIN)
-        samples.push({ sx, sy, angleDeg: sample.angleDeg, length: len, slack })
+    const samples: { sx: number; sy: number; angleDeg: number; length: number; slack: boolean }[] = []
+    const zoom = map.getZoom()
+    if (grid && landMaskRef.current) {
+      const spacing = oscarLod(zoom).spacingPx
+      ctx.globalAlpha = opacity
+      for (let sy = spacing / 2; sy < ch; sy += spacing) {
+        for (let sx = spacing / 2; sx < cw; sx += spacing) {
+          if (isLandPx(sx, sy)) continue
+          const ll = map.unproject([sx, sy])
+          const sample = sampleOscar(grid, ll.lat, ll.lng)
+          if (!sample) continue
+          const slack = sample.speedKt < OSCAR_SLACK_KT
+          if (!slack) flowing++
+          const t = Math.min(sample.speedKt / OSCAR_SPEED_MAX_KT, 1)
+          const len = ARROW_LENGTH_MIN + t * (ARROW_LENGTH_MAX - ARROW_LENGTH_MIN)
+          samples.push({ sx, sy, angleDeg: sample.angleDeg, length: len, slack })
+        }
       }
     }
     // Harbor / high zoom: OSCAR is ~0.25° — a slack tick grid is fake.
@@ -192,6 +195,7 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     if (showHint !== harborHintRef.current) {
       harborHintRef.current = showHint
       setHarborHint(showHint)
+      setCurrentsZoomHint(showHint)
     }
     if (!sparse) {
       for (const s of samples) {
@@ -199,7 +203,7 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
       }
     }
     ctx.globalAlpha = 1
-  }, [mapRef, visible, opacity])
+  }, [mapRef, visible, opacity, setCurrentsZoomHint])
 
   const fetchData = useCallback(async () => {
     const map = mapRef.current
@@ -234,16 +238,20 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
       if (result) {
         gridRef.current = result
         render()
-      } else if (map.getZoom() >= 8) {
+      } else {
         harborHintRef.current = true
         setHarborHint(true)
+        setCurrentsZoomHint(true)
       }
     } catch {
       if (controller.signal.aborted) return
+      harborHintRef.current = true
+      setHarborHint(true)
+      setCurrentsZoomHint(true)
     } finally {
       if (!controller.signal.aborted) setLayerLoading('current-arrows', false)
     }
-  }, [mapRef, visible, render, setLayerLoading])
+  }, [mapRef, visible, render, setLayerLoading, setCurrentsZoomHint])
 
   const scheduleFetch = useCallback(() => {
     if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current)
@@ -282,6 +290,7 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
     window.addEventListener('resize', onResize)
 
     if (visible) {
+      setCurrentsZoomHint(true)
       void rebuildLandMask().then(() => { render(); void fetchData() })
     }
 
@@ -293,8 +302,9 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
       abortRef.current?.abort()
       if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current)
       setLayerLoading('current-arrows', false)
+      setCurrentsZoomHint(false)
     }
-  }, [mapRef, visible, syncSize, render, fetchData, scheduleFetch, rebuildLandMask, setLayerLoading])
+  }, [mapRef, visible, syncSize, render, fetchData, scheduleFetch, rebuildLandMask, setLayerLoading, setCurrentsZoomHint])
 
   useEffect(() => {
     if (!visible) {
@@ -307,11 +317,17 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
       if (harborHintRef.current) {
         harborHintRef.current = false
         setHarborHint(false)
+        setCurrentsZoomHint(false)
       }
       return
     }
+    if (!harborHintRef.current) {
+      harborHintRef.current = true
+      setHarborHint(true)
+      setCurrentsZoomHint(true)
+    }
     render()
-  }, [visible, opacity, render])
+  }, [visible, opacity, render, setCurrentsZoomHint])
 
   return (
     <>
@@ -321,7 +337,10 @@ export default function CurrentArrowOverlay({ mapRef, visible, opacity }: Props)
         style={{ zIndex: 15 }}
       />
       {visible && harborHint && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none px-2.5 py-1 rounded-md bg-black/65 border border-white/15 text-[11px] text-slate-200">
+        <div
+          className="absolute top-28 left-1/2 -translate-x-1/2 z-40 pointer-events-none px-3 py-1.5 rounded-lg bg-black/75 border border-cyan-400/35 text-[12px] font-medium text-slate-100 shadow-lg whitespace-nowrap"
+          role="status"
+        >
           Zoom out for currents
         </div>
       )}

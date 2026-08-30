@@ -303,7 +303,7 @@ function withSshStamp(def: LegendDef, sshStamp: string | null): LegendDef {
 }
 
 export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forecastBarOpen?: boolean; hidden?: boolean }) {
-  const { layers, sstRange, sshStamp, sstEmpty } = useMapStore()
+  const { layers, sstRange, sshStamp, sstEmpty, currentsZoomHint } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
   const activeLegends = LEGENDS.filter((def) => {
@@ -311,6 +311,7 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
       return weatherOverlays.find((o) => o.id === def.layerId)?.visible
     }
     if ((def.layerId === 'sst-mur' || def.layerId === 'sst-goes') && sstEmpty) return false
+    if (def.layerId === 'current-arrows' && currentsZoomHint) return false
     return layers.find((l) => l.id === def.layerId)?.visible
   }).map((def) => {
     const paint = sstPaintRange(sstRange)
@@ -356,7 +357,7 @@ export function ColorLegend({ forecastBarOpen = false, hidden = false }: { forec
 
 /** Compact legend pinned inside the right rail (Windy-class, not a map HUD). */
 export function PinnedLegend() {
-  const { layers, sstRange, sshStamp, sstEmpty } = useMapStore()
+  const { layers, sstRange, sshStamp, sstEmpty, currentsZoomHint } = useMapStore()
   const weatherOverlays = useWeatherStore((s) => s.overlays)
 
   const activeLegends = LEGENDS.filter((def) => {
@@ -377,12 +378,20 @@ export function PinnedLegend() {
       <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider px-0.5">
         Legend
       </p>
-      {activeLegends.slice(0, 3).map((def) => (
-        <div key={def.layerId} className="rounded-lg bg-black/25 border border-white/8 px-2 py-1.5">
+      {activeLegends.slice(0, 3).map((def) => {
+        const dimCurrents = def.layerId === 'current-arrows' && currentsZoomHint
+        return (
+        <div
+          key={def.layerId}
+          className={`rounded-lg bg-black/25 border border-white/8 px-2 py-1.5 ${dimCurrents ? 'opacity-40' : ''}`}
+        >
           <div className="flex items-center justify-between mb-1 gap-2">
             <span className="text-[10px] font-medium text-slate-300 truncate">{def.title}</span>
             <span className="text-[9px] text-slate-500 font-mono flex-shrink-0">{def.unit}</span>
           </div>
+          {dimCurrents && (
+            <p className="text-[10px] font-medium text-cyan-200/90 mb-1">Zoom out for currents</p>
+          )}
           {def.stamp && (
             <p className="text-[10px] font-semibold text-cyan-200 mb-1 tracking-wide">{def.stamp}</p>
           )}
@@ -399,7 +408,8 @@ export function PinnedLegend() {
             ))}
           </div>
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

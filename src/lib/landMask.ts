@@ -9,12 +9,13 @@
  */
 
 import type maplibregl from 'maplibre-gl'
+import { pointInPolygon } from './pointInPolygon'
 
 // ---------------------------------------------------------------------------
 // Types & cache
 // ---------------------------------------------------------------------------
 
-interface LandRing {
+export interface LandRing {
   coords: number[][]    // [lng, lat] pairs
   minLng: number
   maxLng: number
@@ -372,6 +373,23 @@ function latToY(lat: number): number {
   return (y * MERCATOR_MAX) / 180
 }
 
+function makeMaskCanvas(w: number, h: number): OffscreenCanvas | HTMLCanvasElement | null {
+  if (typeof OffscreenCanvas !== 'undefined') {
+    try {
+      return new OffscreenCanvas(w, h)
+    } catch {
+      /* fall through */
+    }
+  }
+  if (typeof document !== 'undefined') {
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    return c
+  }
+  return null
+}
+
 export function parseWmsBbox3857(url: string): { xmin: number; ymin: number; xmax: number; ymax: number } | null {
   const m = url.match(/BBOX=([^&]+)/i)
   if (!m) return null
@@ -380,6 +398,40 @@ export function parseWmsBbox3857(url: string): { xmin: number; ymin: number; xma
   const parts = raw.split(',').map(Number)
   if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) return null
   return { xmin: parts[0], ymin: parts[1], xmax: parts[2], ymax: parts[3] }
+}
+
+/**
+ * Even-odd test against land rings. Used when a harbor-scale tile sits
+ * entirely inside a continent so Sutherland–Hodgman clip returns empty.
+ */
+export function evenOddLandAt(rings: LandRing[], lng: number, lat: number): boolean {
+  let inside = false
+  for (const ring of rings) {
+    if (lng < ring.minLng || lng > ring.maxLng || lat < ring.minLat || lat > ring.maxLat) continue
+    if (pointInPolygon([lng, lat], ring.coords as [number, number][])) inside = !inside
+  }
+  return inside
+}
+
+/** Extra land pixels at small (harbor) tile spans so 10m coast still punches streets. */
+export function harborLandInflatePx(east: number, west: number, north: number, south: number): number {
+  const span = Math.max(east - west, north - south)
+  if (span < 0.08) return 22
+  if (span < 0.25) return 12
+  if (span < 0.8) return 6
+  return 2
+}
+
+/**
+ * How far (degrees) to search for 10m land outside a tile.
+ * world-atlas 10m misses Gulf barrier islands by ~0.05°.
+ */
+export function harborLandPadDeg(east: number, west: number, north: number, south: number): number {
+  const span = Math.max(east - west, north - south)
+  if (span < 0.08) return 0.09
+  if (span < 0.2) return 0.05
+  if (span < 0.6) return 0.02
+  return 0.01
 }
 
 /**
@@ -399,17 +451,20 @@ export async function eraseLandFromTile(
   const north = yToLat(bbox.ymax)
   if (!(east > west) || !(north > south)) return
 
-  const mask = document.createElement('canvas')
-  mask.width = w
-  mask.height = h
-  const ctx = mask.getContext('2d')
+  const mask = makeMaskCanvas(w, h)
+  const ctx = mask?.getContext('2d')
   if (!ctx) return
   ctx.fillStyle = '#000'
   ctx.beginPath()
+  const padDeg = harborLandPadDeg(east, west, north, south)
+  const clipW = west - padDeg
+  const clipE = east + padDeg
+  const clipS = south - padDeg
+  const clipN = north + padDeg
   let traced = 0
   for (const ring of land.rings) {
-    if (ring.maxLng < west || ring.minLng > east || ring.maxLat < south || ring.minLat > north) continue
-    const coords = clipRingToBBox(ring.coords, west - 0.05, east + 0.05, south - 0.05, north + 0.05)
+    if (ring.maxLng < clipW || ring.minLng > clipE || ring.maxLat < clipS || ring.minLat > clipN) continue
+    const coords = clipRingToBBox(ring.coords, clipW, clipE, clipS, clipN)
     if (coords.length < 3) continue
     const x0 = ((lngToX(coords[0][0]) - bbox.xmin) / (bbox.xmax - bbox.xmin)) * w
     const y0 = ((bbox.ymax - latToY(coords[0][1])) / (bbox.ymax - bbox.ymin)) * h
@@ -422,8 +477,21 @@ export async function eraseLandFromTile(
     ctx.closePath()
     traced++
   }
-  if (traced === 0) return
-  ctx.fill('evenodd')
+  if (traced === 0) {
+    const cx = (west + east) / 2
+    const cy = (south + north) / 2
+    if (!evenOddLandAt(land.rings, cx, cy)) return
+    ctx.fillRect(0, 0, w, h)
+  } else {
+    ctx.fill('evenodd')
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = '#000'
+    const spanX = Math.max(east - west, 1e-9)
+    const padPx = (padDeg / spanX) * w
+    ctx.lineWidth = Math.max(harborLandInflatePx(east, west, north, south), padPx) * 2
+    ctx.stroke()
+  }
   const landPx = ctx.getImageData(0, 0, w, h).data
   const px = imageData.data
   for (let i = 0; i < px.length; i += 4) {
