@@ -13,6 +13,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import type maplibregl from 'maplibre-gl'
 import { useWeatherStore, selectOverlayHour } from '../../store/weatherStore'
 import {
+  GLM_DENSITY_LAYER,
   GLM_PROBE_FAILS_BEFORE_HRRR,
   GLM_TILE_REFRESH_MS,
   glmFlashesFromApi,
@@ -23,9 +24,9 @@ import {
   lightningChipVisible,
   realEarthGlmFedUrl,
   realEarthGlmProbeUrl,
+  restackGlmAboveImagery,
   type LightningProduct,
 } from '../../lib/lightningOverlay'
-import { registerNorefProtocol } from '../../lib/norefTileProtocol'
 
 interface Props {
   mapRef: React.RefObject<maplibregl.Map | null>
@@ -40,7 +41,7 @@ interface Flash {
 }
 
 const GLM_SOURCE = 'glm-density-source'
-const GLM_LAYER = 'glm-density-layer'
+const GLM_LAYER = GLM_DENSITY_LAYER
 const GLM_API = 'https://xhac6pdww5.execute-api.us-east-2.amazonaws.com/glm/flashes'
 const FLASH_MAX_AGE = 10000
 const POLL_INTERVAL = 20000
@@ -106,7 +107,6 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
   }, [mapRef])
 
   const applyTiles = useCallback((tileUrl: string, product: LightningProduct) => {
-    registerNorefProtocol()
     const map = mapRef.current
     if (!map || !map.isStyleLoaded()) return
 
@@ -121,11 +121,9 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
         paint: {
           'raster-opacity': opacityRef.current,
           'raster-opacity-transition': { duration: 300, delay: 0 },
+          'raster-fade-duration': 0,
         },
       })
-      for (const id of ['clusters', 'cluster-count', 'fishing-spots', 'fishing-spots-rigs', 'fishing-spots-labels']) {
-        if (map.getLayer(id)) map.moveLayer(id)
-      }
     }
     map.setLayoutProperty(GLM_LAYER, 'visibility', 'visible')
     map.setPaintProperty(GLM_LAYER, 'raster-opacity', opacityRef.current)
@@ -135,6 +133,8 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
       if (src?.setTiles) src.setTiles([tileUrl])
       lastTileUrl.current = tileUrl
     }
+
+    restackGlmAboveImagery(map)
 
     if (productRef.current !== product) {
       productRef.current = product
@@ -227,6 +227,9 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
 
     syncSize()
 
+    const restack = () => {
+      try { restackGlmAboveImagery(map) } catch { /* style not ready */ }
+    }
     const run = () => { void probeAndPaint() }
     if (map.isStyleLoaded()) run()
     else map.once('style.load', run)
@@ -237,6 +240,9 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
       setTimeout(run, 50)
     }
     map.on('style.load', onStyleLoad)
+    // Later SST / colormap rebuilds addLayer after GLM — keep FED on top.
+    map.on('idle', restack)
+    const restackTimer = window.setTimeout(restack, 250)
 
     fetchFlashes()
     pollTimer.current = setInterval(fetchFlashes, POLL_INTERVAL)
@@ -246,13 +252,11 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
     }, GLM_TILE_REFRESH_MS)
 
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    let running = true
+    let running = !!ctx
     const container = map.getContainer()
 
     const frame = () => {
-      if (!running) return
+      if (!running || !ctx) return
       const now = Date.now()
       const cw = container.clientWidth
       const ch = container.clientHeight
@@ -309,7 +313,7 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
       animRef.current = requestAnimationFrame(frame)
     }
 
-    animRef.current = requestAnimationFrame(frame)
+    if (ctx) animRef.current = requestAnimationFrame(frame)
 
     const onResize = () => syncSize()
     map.on('resize', onResize)
@@ -319,6 +323,8 @@ export default function LightningOverlay({ mapRef, mapReady }: Props) {
       cancelAnimationFrame(animRef.current)
       map.off('resize', onResize)
       map.off('style.load', onStyleLoad)
+      map.off('idle', restack)
+      window.clearTimeout(restackTimer)
       if (pollTimer.current) clearInterval(pollTimer.current)
       if (refreshTimer.current) clearInterval(refreshTimer.current)
     }

@@ -41,13 +41,60 @@ export function glmTileCacheBust(nowMs = Date.now()): number {
   return Math.floor(nowMs / GLM_TILE_REFRESH_MS)
 }
 
-/** Same-origin Vite proxy when available; noref:// protocol otherwise. */
+export const GLM_DENSITY_LAYER = 'glm-density-layer'
+
+/** Same list RadarOverlay uses, plus FADs — stay above GLM after restack. */
+export const GLM_SPOT_LAYER_IDS = [
+  'clusters',
+  'cluster-count',
+  'fishing-spots',
+  'fishing-spots-rigs',
+  'fishing-spots-fads',
+  'fishing-spots-labels',
+] as const
+
+/** Imagery rasters that must stay under live GLM FED. */
+export const GLM_IMAGERY_BELOW_IDS = [
+  'sst-mur',
+  'sst-goes',
+  'chlorophyll',
+  'true-color-viirs',
+  'sargassum',
+  'satellite-imagery',
+] as const
+
+export function chlorophyll7DaySubIds(days = 7): string[] {
+  return Array.from({ length: days }, (_, d) => `chlorophyll-7day-d${d}`)
+}
+
+export function layersThatMustStayBelowGlm(): string[] {
+  return [...GLM_IMAGERY_BELOW_IDS, ...chlorophyll7DaySubIds()]
+}
+
+type LayerStackMap = {
+  getLayer(id: string): unknown
+  moveLayer(id: string, beforeId?: string): void
+}
+
+/**
+ * Put GLM FED on top of imagery (SST etc.), then fishing-spot layers above GLM.
+ * Call whenever tiles apply and after later imagery rebuilds (map idle).
+ */
+export function restackGlmAboveImagery(map: LayerStackMap): void {
+  if (!map.getLayer(GLM_DENSITY_LAYER)) return
+  map.moveLayer(GLM_DENSITY_LAYER)
+  for (const id of GLM_SPOT_LAYER_IDS) {
+    if (map.getLayer(id)) map.moveLayer(id)
+  }
+}
+
+/** Vite same-origin proxy on :5173; production uses native https:// like Radar. */
 export function realEarthGlmFedUrl(cacheBust: number | string = glmTileCacheBust()): string {
   const path = `tiles/${REALEARTH_GLM_FED_LAYER}/{z}/{x}/{y}.png?t=${cacheBust}`
   if (typeof window !== 'undefined' && window.location.port === '5173') {
     return `/proxy/realearth/${path}`
   }
-  return `noref://realearth.ssec.wisc.edu/${path}`
+  return realEarthGlmHttpsUrl(cacheBust)
 }
 
 export function realEarthGlmHttpsUrl(cacheBust: number | string = glmTileCacheBust()): string {
