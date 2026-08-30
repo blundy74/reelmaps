@@ -4,14 +4,16 @@ import type { MapLayer, BasemapId, FishingSpot, ClickedPoint } from '../types'
 import { LAYER_REGISTRY } from '../lib/layerUrls'
 import { getDefaultDate, toISODate } from '../lib/utils'
 import { DEFAULT_SST_RANGE, type SstRange } from '../lib/sstPalette'
+import { GULF_HOME, isGenericHomeView } from '../lib/homeViewport'
+import { applyExclusiveImagery } from '../lib/imageryLayers'
 
 // ---------------------------------------------------------------------------
 // Build initial layer state from registry
 // ---------------------------------------------------------------------------
 
 const DEFAULT_VISIBLE: Record<string, boolean> = {
-  'sst-mur': false,
-  'fishing-spots': true,
+  'sst-mur': true,
+  'fishing-spots': false,
   'bathymetry': false,
   'bathymetry-contours': false,
   'openseamap': false,
@@ -143,11 +145,20 @@ interface MapState {
   sshStamp: string | null
   sshSource: 'erddap' | 'gibs' | null
 
+  /** SST tiles missing for the selected date — layer stays on. */
+  sstEmpty: boolean
+  /** Hotspot tiles missing for the current date/view. */
+  hotspotEmpty: boolean
+
   // Actions
   setViewState: (vs: Partial<MapState['viewState']>) => void
   setLayerLoading: (id: string, loading: boolean) => void
   setSshMeta: (stamp: string | null, source: 'erddap' | 'gibs' | null) => void
+  setSstEmpty: (empty: boolean) => void
+  setHotspotEmpty: (empty: boolean) => void
   toggleLayer: (id: string) => void
+  setLayerVisible: (id: string, visible: boolean) => void
+  selectImagery: (id: string) => void
   setLayerOpacity: (id: string, opacity: number) => void
   setBasemap: (id: BasemapId) => void
   setSelectedDate: (date: string) => void
@@ -173,9 +184,9 @@ export const useMapStore = create<MapState>()(
   persist(
     (set) => ({
       viewState: {
-        longitude: -80,
-        latitude: 30,
-        zoom: 4,
+        longitude: GULF_HOME.longitude,
+        latitude: GULF_HOME.latitude,
+        zoom: GULF_HOME.zoom,
         bearing: 0,
         pitch: 0,
       },
@@ -198,9 +209,14 @@ export const useMapStore = create<MapState>()(
       loadingLayers: {},
       sshStamp: null,
       sshSource: null,
+      sstEmpty: false,
+      hotspotEmpty: false,
 
       setViewState: (vs) =>
         set((state) => ({ viewState: { ...state.viewState, ...vs } })),
+
+      setSstEmpty: (empty) => set({ sstEmpty: empty }),
+      setHotspotEmpty: (empty) => set({ hotspotEmpty: empty }),
 
       setLayerLoading: (id, loading) =>
         set((state) => {
@@ -215,6 +231,18 @@ export const useMapStore = create<MapState>()(
           layers: state.layers.map((l) =>
             l.id === id ? { ...l, visible: !l.visible } : l,
           ),
+        })),
+
+      setLayerVisible: (id, visible) =>
+        set((state) => ({
+          layers: state.layers.map((l) =>
+            l.id === id ? { ...l, visible } : l,
+          ),
+        })),
+
+      selectImagery: (id) =>
+        set((state) => ({
+          layers: applyExclusiveImagery(state.layers, id),
         })),
 
       setLayerOpacity: (id, opacity) =>
@@ -241,7 +269,7 @@ export const useMapStore = create<MapState>()(
     }),
     {
       name: 'reelmaps-map-state',
-      version: 15,
+      version: 16,
       migrate: (persisted, version) => {
         const state = persisted as {
           layers?: MapLayer[]
@@ -265,18 +293,24 @@ export const useMapStore = create<MapState>()(
             if (l.id === 'currents' || l.id === 'ssh-anomaly') l.visible = false
           }
         }
+        // v16: SST on, Fishing Spots off, leave leftover East Coast / Bahamas cameras.
+        if (version < 16) {
+          for (const l of layers) {
+            if (l.id === 'sst-mur') l.visible = true
+            if (l.id === 'sst-goes') l.visible = false
+            if (l.id === 'fishing-spots') l.visible = false
+          }
+        }
+        let viewState = state.viewState ?? { ...GULF_HOME }
+        if (version < 16 && isGenericHomeView(viewState)) {
+          viewState = { ...GULF_HOME }
+        }
         return {
           layers,
           basemap: state.basemap ?? 'satellite',
           selectedDate: state.selectedDate ?? toISODate(getDefaultDate()),
           sidebarOpen: state.sidebarOpen ?? true,
-          viewState: state.viewState ?? {
-            longitude: -80,
-            latitude: 30,
-            zoom: 4,
-            bearing: 0,
-            pitch: 0,
-          },
+          viewState,
           droppedPin: state.droppedPin ?? null,
           sstRange,
         }

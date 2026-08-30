@@ -3,6 +3,13 @@ import { useMapStore } from '../../store/mapStore'
 import { useWeatherStore } from '../../store/weatherStore'
 import { useUserSpotsStore } from '../../store/userSpotsStore'
 import { WMO_CODES, degreesToCardinal, windToBeaufort, waveHeightToSeaState } from '../../lib/weatherTypes'
+import {
+  MISSING_DISPLAY,
+  formatModelCurrentKt,
+  formatModelFeet,
+  formatModelTempF,
+  isUnavailableZero,
+} from '../../lib/marineDisplay'
 
 /** Convert decimal degrees to degrees-minutes-seconds string */
 function toDMS(decimal: number, isLat: boolean): string {
@@ -273,36 +280,48 @@ export default function DroppedPinPanel() {
                   <div className="bg-ocean-800 rounded-lg px-3 py-2 min-w-[120px]">
                     <div className="text-[9px] text-slate-500 uppercase mb-0.5">Swell</div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-sm font-bold text-slate-100 font-mono">{marineNow.swellHeight.toFixed(1)}</span>
-                      <span className="text-[10px] text-slate-500">ft</span>
+                      <span className="text-sm font-bold text-slate-100 font-mono">{formatModelFeet(marineNow.swellHeight).replace(' ft', '')}</span>
+                      <span className="text-[10px] text-slate-500">{isUnavailableZero(marineNow.swellHeight) ? '' : 'ft'}</span>
                     </div>
-                    <div className="text-[10px] text-slate-400">{marineNow.swellPeriod.toFixed(0)}s {degreesToCardinal(marineNow.swellDirection)}</div>
+                    <div className="text-[10px] text-slate-400">
+                      {isUnavailableZero(marineNow.swellHeight)
+                        ? MISSING_DISPLAY
+                        : `${marineNow.swellPeriod.toFixed(0)}s ${degreesToCardinal(marineNow.swellDirection ?? 0)}`}
+                    </div>
                   </div>
 
                   {/* Wind Waves */}
                   <div className="bg-ocean-800 rounded-lg px-3 py-2 min-w-[120px]">
                     <div className="text-[9px] text-slate-500 uppercase mb-0.5">Wind Waves</div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-sm font-bold text-slate-100 font-mono">{marineNow.windWaveHeight.toFixed(1)}</span>
-                      <span className="text-[10px] text-slate-500">ft</span>
+                      <span className="text-sm font-bold text-slate-100 font-mono">{formatModelFeet(marineNow.windWaveHeight).replace(' ft', '')}</span>
+                      <span className="text-[10px] text-slate-500">{isUnavailableZero(marineNow.windWaveHeight) ? '' : 'ft'}</span>
                     </div>
-                    <div className="text-[10px] text-slate-400">{marineNow.windWavePeriod.toFixed(0)}s {degreesToCardinal(marineNow.windWaveDirection)}</div>
+                    <div className="text-[10px] text-slate-400">
+                      {isUnavailableZero(marineNow.windWaveHeight)
+                        ? MISSING_DISPLAY
+                        : `${(marineNow.windWavePeriod ?? 0).toFixed(0)}s ${degreesToCardinal(marineNow.windWaveDirection ?? 0)}`}
+                    </div>
                   </div>
 
                   {/* Model water temp — Open-Meteo marine, not satellite SST */}
                   <div className="bg-ocean-800 rounded-lg px-3 py-2 min-w-[100px]">
                     <div className="text-[9px] text-slate-500 uppercase mb-0.5">Model water temp</div>
-                    <span className="text-sm font-bold text-cyan-300 font-mono">{Math.round(marineNow.seaSurfaceTemp)}°F</span>
+                    <span className="text-sm font-bold text-cyan-300 font-mono">{formatModelTempF(marineNow.seaSurfaceTemp)}</span>
                   </div>
 
                   {/* Current */}
                   <div className="bg-ocean-800 rounded-lg px-3 py-2 min-w-[120px]">
                     <div className="text-[9px] text-slate-500 uppercase mb-0.5">Current</div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-sm font-bold text-slate-100 font-mono">{marineNow.oceanCurrentSpeed.toFixed(1)}</span>
-                      <span className="text-[10px] text-slate-500">kt</span>
+                      <span className="text-sm font-bold text-slate-100 font-mono">{formatModelCurrentKt(marineNow.oceanCurrentSpeed).replace(' kt', '')}</span>
+                      <span className="text-[10px] text-slate-500">{isUnavailableZero(marineNow.oceanCurrentSpeed) ? '' : 'kt'}</span>
                     </div>
-                    <div className="text-[10px] text-slate-400">{degreesToCardinal(marineNow.oceanCurrentDirection)}</div>
+                    <div className="text-[10px] text-slate-400">
+                      {isUnavailableZero(marineNow.oceanCurrentSpeed)
+                        ? MISSING_DISPLAY
+                        : degreesToCardinal(marineNow.oceanCurrentDirection ?? 0)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -333,13 +352,29 @@ export default function DroppedPinPanel() {
                 <div className="grid grid-cols-2 gap-1.5">
                   <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
                     <div className="text-[9px] text-slate-500 uppercase">Swell</div>
-                    <div className="text-xs font-semibold text-slate-200 font-mono">{marineNow.swellHeight.toFixed(1)} ft @ {marineNow.swellPeriod.toFixed(0)}s</div>
-                    <div className="text-[10px] text-slate-500">{degreesToCardinal(marineNow.swellDirection)}</div>
+                    <div className="text-xs font-semibold text-slate-200 font-mono">
+                      {isUnavailableZero(marineNow.swellHeight)
+                        ? MISSING_DISPLAY
+                        : `${marineNow.swellHeight!.toFixed(1)} ft @ ${marineNow.swellPeriod.toFixed(0)}s`}
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {isUnavailableZero(marineNow.swellHeight)
+                        ? ''
+                        : degreesToCardinal(marineNow.swellDirection ?? 0)}
+                    </div>
                   </div>
                   <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
                     <div className="text-[9px] text-slate-500 uppercase">Wind Waves</div>
-                    <div className="text-xs font-semibold text-slate-200 font-mono">{marineNow.windWaveHeight.toFixed(1)} ft @ {marineNow.windWavePeriod.toFixed(0)}s</div>
-                    <div className="text-[10px] text-slate-500">{degreesToCardinal(marineNow.windWaveDirection)}</div>
+                    <div className="text-xs font-semibold text-slate-200 font-mono">
+                      {isUnavailableZero(marineNow.windWaveHeight)
+                        ? MISSING_DISPLAY
+                        : `${marineNow.windWaveHeight!.toFixed(1)} ft @ ${(marineNow.windWavePeriod ?? 0).toFixed(0)}s`}
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {isUnavailableZero(marineNow.windWaveHeight)
+                        ? ''
+                        : degreesToCardinal(marineNow.windWaveDirection ?? 0)}
+                    </div>
                   </div>
                 </div>
 
@@ -347,11 +382,15 @@ export default function DroppedPinPanel() {
                 <div className="grid grid-cols-2 gap-1.5">
                   <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
                     <div className="text-[9px] text-slate-500 uppercase">Model water temp</div>
-                    <span className="text-xs font-semibold text-cyan-300 font-mono">{Math.round(marineNow.seaSurfaceTemp)}°F</span>
+                    <span className="text-xs font-semibold text-cyan-300 font-mono">{formatModelTempF(marineNow.seaSurfaceTemp)}</span>
                   </div>
                   <div className="bg-ocean-800 rounded-lg px-2.5 py-1.5">
                     <div className="text-[9px] text-slate-500 uppercase">Current</div>
-                    <div className="text-xs font-semibold text-slate-200 font-mono">{marineNow.oceanCurrentSpeed.toFixed(1)} kt {degreesToCardinal(marineNow.oceanCurrentDirection)}</div>
+                    <div className="text-xs font-semibold text-slate-200 font-mono">
+                      {isUnavailableZero(marineNow.oceanCurrentSpeed)
+                        ? MISSING_DISPLAY
+                        : `${formatModelCurrentKt(marineNow.oceanCurrentSpeed)} ${degreesToCardinal(marineNow.oceanCurrentDirection ?? 0)}`}
+                    </div>
                   </div>
                 </div>
 

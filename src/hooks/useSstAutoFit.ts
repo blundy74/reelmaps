@@ -1,16 +1,13 @@
 /**
- * Auto-fit SST palette to p5–p95 of water in view.
+ * Auto-fit SST palette to water in view.
  *
  * Re-Fit ONLY on:
  *   1. first SST show (hydrate + SST appears)
  *   2. MUR ↔ Daily imagery switch
  *   3. explicit Fit tap (chip — not this hook)
  *
- * Date scrub does NOT re-sample. A Fit / Loop / sail / Wide window
- * survives the next pass, same as Hilton Min/Max and SatFish Previous.
- * Pans do not re-sample (boundsReady, not the bounds object).
- *
- * Locked chips (gom / wide / custom) never auto-fit.
+ * Date scrub does NOT re-sample the Fit window. A separate probe
+ * marks "No SST for this date" without turning the layer off.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -41,6 +38,8 @@ export function useSstAutoFit() {
   const layers = useMapStore((s) => s.layers)
   const mapBounds = useMapStore((s) => s.mapBounds)
   const setSstRange = useMapStore((s) => s.setSstRange)
+  const setSstEmpty = useMapStore((s) => s.setSstEmpty)
+  const selectedDate = useMapStore((s) => s.selectedDate)
   const hydrated = usePersistHydrated()
 
   const layerId = activeSstLayerId(layers)
@@ -76,4 +75,33 @@ export function useSstAutoFit() {
     return () => controller.abort()
     // selectedDate is intentionally omitted — date scrub keeps the last window.
   }, [hydrated, preset, layerId, boundsReady, setSstRange])
+
+  useEffect(() => {
+    if (!hydrated) {
+      return
+    }
+    if (!layerId || !boundsReady) {
+      setSstEmpty(false)
+      return
+    }
+    const bounds = boundsRef.current
+    if (!bounds) return
+
+    const controller = new AbortController()
+    void (async () => {
+      try {
+        const span = await sampleSstRangeFromView(
+          layerId,
+          selectedDate,
+          bounds,
+          controller.signal,
+        )
+        if (controller.signal.aborted) return
+        setSstEmpty(!span)
+      } catch {
+        if (!controller.signal.aborted) setSstEmpty(true)
+      }
+    })()
+    return () => controller.abort()
+  }, [hydrated, layerId, boundsReady, selectedDate, setSstEmpty])
 }

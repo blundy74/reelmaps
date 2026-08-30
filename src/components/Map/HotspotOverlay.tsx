@@ -66,6 +66,7 @@ export default function HotspotOverlay({ mapRef, variant = 'hotspot', mapReady }
     (s) => s.layers.find((l) => l.id === variant)?.opacity ?? 0.55,
   )
   const selectedDate = useMapStore((s) => s.selectedDate)
+  const setHotspotEmpty = useMapStore((s) => s.setHotspotEmpty)
   const activeDateKey = useRef('')
 
   // Main effect: manage layer lifecycle based on visibility and date
@@ -82,6 +83,7 @@ export default function HotspotOverlay({ mapRef, variant = 'hotspot', mapReady }
         if (map.getLayer(layerId)) {
           map.setLayoutProperty(layerId, 'visibility', 'none')
         }
+        if (variant === 'hotspot') setHotspotEmpty(false)
         return
       }
 
@@ -111,10 +113,23 @@ export default function HotspotOverlay({ mapRef, variant = 'hotspot', mapReady }
     }
     map.on('style.load', onStyleLoad)
 
+    const onError = (e: { sourceId?: string }) => {
+      if (variant === 'hotspot' && e.sourceId === sourceId) setHotspotEmpty(true)
+    }
+    const onSourceData = (e: { sourceId?: string; isSourceLoaded?: boolean }) => {
+      if (variant === 'hotspot' && e.sourceId === sourceId && e.isSourceLoaded) {
+        setHotspotEmpty(false)
+      }
+    }
+    map.on('error', onError)
+    map.on('sourcedata', onSourceData)
+
     return () => {
       map.off('style.load', onStyleLoad)
+      map.off('error', onError)
+      map.off('sourcedata', onSourceData)
     }
-  }, [mapRef, visible, opacity, selectedDate, sourceId, layerId, variant, mapReady])
+  }, [mapRef, visible, opacity, selectedDate, sourceId, layerId, variant, mapReady, setHotspotEmpty])
 
   // Cleanup on unmount
   useEffect(() => {

@@ -324,7 +324,7 @@ export interface LayerDef {
 export const LAYER_REGISTRY: LayerDef[] = [
   {
     id: 'sst-mur',
-    name: 'SST Analysis (MUR)',
+    name: 'Sea Surface Temp',
     description: 'NASA MUR L4 — 1 km daily cloud-free SST analysis blended from multiple sensors. Use this for a complete temperature picture through clouds, not as the break-hunting pass.',
     group: 'satellite',
     sourceType: 'raster-wms',

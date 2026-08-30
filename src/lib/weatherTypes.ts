@@ -51,15 +51,15 @@ export interface MarineHourlyEntry {
   waveHeight: number        // ft
   waveDirection: number     // degrees
   wavePeriod: number        // seconds
-  windWaveHeight: number
-  windWaveDirection: number
-  windWavePeriod: number
-  swellHeight: number
-  swellDirection: number
+  windWaveHeight: number | null
+  windWaveDirection: number | null
+  windWavePeriod: number | null
+  swellHeight: number | null
+  swellDirection: number | null
   swellPeriod: number
-  oceanCurrentSpeed: number // knots
-  oceanCurrentDirection: number
-  seaSurfaceTemp: number   // °F
+  oceanCurrentSpeed: number | null // knots — not in the wave-grid payload
+  oceanCurrentDirection: number | null
+  seaSurfaceTemp: number | null   // °F — not in the wave-grid payload
 }
 
 export interface WeatherOverlayDef {

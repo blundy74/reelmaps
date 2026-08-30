@@ -79,6 +79,9 @@ async function main() {
     assert(sampled.heightM > 0, 'point sample empty')
     const fromGrid = marineFromWaveGrid(a, 30.1, -88.0)
     assert(fromGrid.hourly[0].time === marine.hourly[0].time, 'rail rows should match grid times')
+    assert(fromGrid.hourly[0].seaSurfaceTemp == null, 'missing SST must not be 0')
+    assert(fromGrid.hourly[0].oceanCurrentSpeed == null, 'missing current must not be 0')
+    assert(fromGrid.hourly[0].swellHeight == null, 'missing swell height must not be 0')
 
     const again = await fetchWaveGrid(south, north, west, east)
     assert(again === a, 'same viewport/hour must hit cache')

@@ -119,7 +119,7 @@ export default function WeatherSidebar({ open, onClose }: Props) {
   } = useWeatherStore()
 
   const layers = useMapStore((s) => s.layers)
-  const toggleLayer = useMapStore((s) => s.toggleLayer)
+  const selectImagery = useMapStore((s) => s.selectImagery)
   const droppedPin = useMapStore((s) => s.droppedPin)
   const clickedPoint = useMapStore((s) => s.clickedPoint)
   const viewState = useMapStore((s) => s.viewState)
@@ -154,7 +154,7 @@ export default function WeatherSidebar({ open, onClose }: Props) {
       return
     }
     if (!isPremium) return
-    toggleLayer(id)
+    selectImagery(id)
   }
 
   return (

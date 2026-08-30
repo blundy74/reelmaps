@@ -30,6 +30,13 @@ import { registerSmoothProtocol } from '../../lib/smoothTileProtocol'
 import { registerContourProtocol } from '../../lib/contourTileProtocol'
 import { registerSstScaleProtocol } from '../../lib/sstScaleProtocol'
 import { useSstAutoFit } from '../../hooks/useSstAutoFit'
+import { useAuthStore } from '../../store/authStore'
+import {
+  GULF_HOME,
+  isExplicitShareView,
+  isGenericHomeView,
+  spotsBoundingBox,
+} from '../../lib/homeViewport'
 import CurrentArrowOverlay from './CurrentArrowOverlay'
 import CurrentSpeedScale from './CurrentSpeedScale'
 import SshContourOverlay from './SshContourOverlay'
@@ -90,6 +97,11 @@ const WMS_LAYERS = new Set([
   'ssh-anomaly',
 ])
 
+function mapToolsBlockPopups(): boolean {
+  const s = useMapStore.getState()
+  return s.measureMode || s.lassoMode || s.pinModeActive
+}
+
 export default function FishingMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -115,7 +127,10 @@ export default function FishingMap() {
     setFlyToTarget,
     sstRange,
     setLayerLoading,
+    sstEmpty,
   } = useMapStore()
+  const sstTilesKeyRef = useRef<Record<string, string>>({})
+  const homeAppliedRef = useRef(false)
 
   useSstAutoFit()
 
@@ -536,6 +551,15 @@ export default function FishingMap() {
           const tiles = tilesForLayer(layerId, selectedDate, sstRange)
           if (!tiles.length) continue
 
+          const nextKey = tiles.join('|')
+          const isSst = layerId === 'sst-mur' || layerId === 'sst-goes'
+          const scaleChanged = isSst && sstTilesKeyRef.current[layerId] !== nextKey
+          if (scaleChanged && map.getSource(`${layerId}-source`)) {
+            if (map.getLayer(layerId)) map.removeLayer(layerId)
+            if (map.getSource(`${layerId}-source`)) map.removeSource(`${layerId}-source`)
+          }
+          sstTilesKeyRef.current[layerId] = nextKey
+
           if (!map.getSource(`${layerId}-source`)) {
             addRasterLayer(map, layerId, tiles, layerState.opacity)
           } else {
@@ -690,6 +714,7 @@ export default function FishingMap() {
 
     // Click on fishing spots
     map.on('click', 'fishing-spots', (e) => {
+      if (mapToolsBlockPopups()) return
       if (!e.features?.length) return
       const props = e.features[0].properties as {
         id: string
@@ -711,6 +736,7 @@ export default function FishingMap() {
 
     // Click on rig icons
     map.on('click', 'fishing-spots-rigs', (e) => {
+      if (mapToolsBlockPopups()) return
       if (!e.features?.length) return
       const props = e.features[0].properties as { id: string }
       const spot = FISHING_SPOTS.find((s) => s.id === props.id)
@@ -721,6 +747,7 @@ export default function FishingMap() {
 
     // Click on FAD icons
     map.on('click', 'fishing-spots-fads', (e) => {
+      if (mapToolsBlockPopups()) return
       if (!e.features?.length) return
       const props = e.features[0].properties as { id: string }
       const spot = FISHING_SPOTS.find((s) => s.id === props.id)
@@ -734,6 +761,7 @@ export default function FishingMap() {
 
     // Click on clusters → zoom in
     map.on('click', 'clusters', (e) => {
+      if (mapToolsBlockPopups()) return
       const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })
       if (!features.length) return
       const clusterId = features[0].properties!.cluster_id
@@ -797,22 +825,36 @@ export default function FishingMap() {
     })
 
     // ── URL deep-link: restore state from hash on load ──────────────────
+    // Leftover app defaults (#lat=30&lng=-80) are not shares — home camera wins.
     const urlState = parseUrlState()
-    if (urlState) {
+    if (urlState && isExplicitShareView({
+      latitude: urlState.lat,
+      longitude: urlState.lng,
+      zoom: urlState.zoom,
+    })) {
       map.setCenter([urlState.lng, urlState.lat])
       map.setZoom(urlState.zoom)
-      // Apply basemap and layers from URL
       const store = useMapStore.getState()
       if (urlState.basemap && urlState.basemap !== store.basemap) {
         store.setBasemap(urlState.basemap)
       }
       if (urlState.layers.length > 0) {
-        // Enable URL layers, disable others (except fishing-spots which is a base layer)
         const urlLayerSet = new Set(urlState.layers)
         for (const l of store.layers) {
           if (urlLayerSet.has(l.id) && !l.visible) store.toggleLayer(l.id)
-          else if (!urlLayerSet.has(l.id) && l.visible && l.id !== 'fishing-spots') store.toggleLayer(l.id)
+          else if (!urlLayerSet.has(l.id) && l.visible && l.id !== 'fishing-spots' && l.id !== 'sst-mur') store.toggleLayer(l.id)
         }
+      }
+    } else if (!urlState || isGenericHomeView({
+      latitude: urlState?.lat ?? useMapStore.getState().viewState.latitude,
+      longitude: urlState?.lng ?? useMapStore.getState().viewState.longitude,
+      zoom: urlState?.zoom ?? useMapStore.getState().viewState.zoom,
+    })) {
+      const vs = useMapStore.getState().viewState
+      if (isGenericHomeView(vs) || !urlState) {
+        map.setCenter([GULF_HOME.longitude, GULF_HOME.latitude])
+        map.setZoom(GULF_HOME.zoom)
+        useMapStore.getState().setViewState({ ...GULF_HOME })
       }
     }
 
@@ -826,11 +868,25 @@ export default function FishingMap() {
       })
     }
 
+    // Header tracks the live camera, not a frozen first hover.
+    let moveRaf = 0
+    map.on('move', () => {
+      if (moveRaf) return
+      moveRaf = requestAnimationFrame(() => {
+        moveRaf = 0
+        const center = map.getCenter()
+        useMapStore.getState().setViewState({
+          latitude: center.lat,
+          longitude: center.lng,
+          zoom: map.getZoom(),
+        })
+      })
+    })
+
     // ── Sync URL hash on map move ──────────────────────────────────────
     map.on('moveend', () => {
       const center = map.getCenter()
       const z = map.getZoom()
-      // Update store so sidebar components can react to map position
       useMapStore.getState().setViewState({ latitude: center.lat, longitude: center.lng, zoom: z })
       publishBounds()
       const { basemap: currentBasemap, layers: currentLayers } = useMapStore.getState()
@@ -1035,6 +1091,7 @@ export default function FishingMap() {
 
       // Click handler — show read-only attribute popup
       map.on('click', 'user-spots', (e) => {
+        if (mapToolsBlockPopups()) return
         if (!e.features?.length) return
         const props = e.features[0].properties as Record<string, any>
         const coords = (e.features[0].geometry as GeoJSON.Point).coordinates as [number, number]
@@ -1083,13 +1140,20 @@ export default function FishingMap() {
           popupEl.appendChild(row)
         }
 
-        const popup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px', offset: 14 })
+        const popup = new maplibregl.Popup({
+          closeButton: true,
+          maxWidth: '300px',
+          offset: 18,
+          anchor: 'top',
+          className: 'spot-popup',
+        })
           .setLngLat(coords)
           .setDOMContent(popupEl)
           .addTo(map)
       })
 
       map.on('click', 'user-clusters', (e) => {
+        if (mapToolsBlockPopups()) return
         const features = map.queryRenderedFeatures(e.point, { layers: ['user-clusters'] })
         if (!features.length) return
         const clusterId = features[0].properties!.cluster_id
@@ -1109,6 +1173,11 @@ export default function FishingMap() {
       const src = map.getSource(sourceId) as maplibregl.GeoJSONSource
       if (src) src.setData(geojson)
     }
+
+    const spotsOn = useMapStore.getState().layers.find((l) => l.id === 'fishing-spots')?.visible ?? false
+    ;['user-spots', 'user-spots-labels', 'user-clusters', 'user-cluster-count'].forEach((id) => {
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', spotsOn ? 'visible' : 'none')
+    })
   }, [loadSpotIcons])
 
   useEffect(() => {
@@ -1144,7 +1213,9 @@ export default function FishingMap() {
       closeButton: true,
       closeOnClick: false,
       maxWidth: '340px',
-      offset: 12,
+      offset: 18,
+      anchor: 'top',
+      className: 'spot-popup',
     })
       .setLngLat(lngLat)
       .setDOMContent(el)
@@ -1158,9 +1229,58 @@ export default function FishingMap() {
     popupRef.current = popup
   }
 
+  const user = useAuthStore((s) => s.user)
+  const spotsFetched = useUserSpotsStore((s) => s.fetched)
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || homeAppliedRef.current) return
+
+    const urlState = parseUrlState()
+    if (urlState && isExplicitShareView({
+      latitude: urlState.lat,
+      longitude: urlState.lng,
+      zoom: urlState.zoom,
+    })) {
+      homeAppliedRef.current = true
+      return
+    }
+
+    if (user && !spotsFetched) return
+
+    if (userSpots.length > 0) {
+      const box = spotsBoundingBox(userSpots)
+      if (box) {
+        homeAppliedRef.current = true
+        map.fitBounds(
+          [[box.west, box.south], [box.east, box.north]],
+          { padding: 72, maxZoom: 8.5, duration: 900 },
+        )
+        return
+      }
+    }
+
+    const vs = useMapStore.getState().viewState
+    if (isGenericHomeView(vs)) {
+      map.jumpTo({ center: [GULF_HOME.longitude, GULF_HOME.latitude], zoom: GULF_HOME.zoom })
+      useMapStore.getState().setViewState({ ...GULF_HOME })
+    }
+    homeAppliedRef.current = true
+  }, [mapReady, user, userSpots, spotsFetched])
+
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
+      {sstEmpty && getLayer('sst-mur')?.visible && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-lg bg-black/70 border border-amber-400/40 text-amber-200 text-[12px] font-medium shadow-lg pointer-events-none">
+          No SST for this date
+        </div>
+      )}
+      {sstEmpty && getLayer('sst-goes')?.visible && !getLayer('sst-mur')?.visible && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-lg bg-black/70 border border-amber-400/40 text-amber-200 text-[12px] font-medium shadow-lg pointer-events-none">
+          No SST for this date
+        </div>
+      )}
       <RadarOverlay mapRef={mapRef} mapReady={mapReady} />
       <CloudOverlay mapRef={mapRef} mapReady={mapReady} />
       <WaveColorOverlay mapRef={mapRef} mapReady={mapReady} />

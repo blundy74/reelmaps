@@ -1,19 +1,53 @@
 import { useState, useCallback } from 'react'
+import { useMapStore } from '../../store/mapStore'
+import { syncStateToUrl } from '../../lib/urlSync'
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
 
 export default function ShareButton() {
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
+  const handleCopy = useCallback(async () => {
+    const { viewState, basemap, layers } = useMapStore.getState()
+    const activeLayers = layers.filter((l) => l.visible).map((l) => l.id)
+    syncStateToUrl(
+      { latitude: viewState.latitude, longitude: viewState.longitude, zoom: viewState.zoom },
+      basemap,
+      activeLayers,
+    )
+    const ok = await copyText(window.location.href)
+    if (!ok) return
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2200)
   }, [])
 
   return (
     <div className="relative">
       <button
-        onClick={handleCopy}
+        onClick={() => { void handleCopy() }}
         title="Copy shareable link"
         className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all shadow-lg border glass border-ocean-600 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40"
       >
@@ -25,8 +59,11 @@ export default function ShareButton() {
       </button>
 
       {copied && (
-        <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-cyan-600 text-white text-[10px] whitespace-nowrap animate-fade-in">
-          Link copied to clipboard
+        <div
+          className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-md bg-cyan-600 text-white text-[11px] font-medium whitespace-nowrap shadow-lg z-50 animate-fade-in"
+          role="status"
+        >
+          Link copied
         </div>
       )}
     </div>

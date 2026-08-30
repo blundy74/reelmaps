@@ -1,5 +1,12 @@
 import type { MarineData } from '../../lib/weatherTypes'
 import { degreesToCardinal, waveHeightToSeaState } from '../../lib/weatherTypes'
+import {
+  MISSING_DISPLAY,
+  formatModelCurrentKt,
+  formatModelFeet,
+  formatModelTempF,
+  isUnavailableZero,
+} from '../../lib/marineDisplay'
 
 interface Props {
   marine: MarineData
@@ -40,10 +47,12 @@ export default function MarineConditions({ marine }: Props) {
         <div className="bg-ocean-800/60 rounded-lg p-2.5 border border-ocean-700/50">
           <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Wind Waves</div>
           <div className="text-sm font-semibold text-slate-200 font-mono">
-            {now.windWaveHeight.toFixed(1)} ft
+            {formatModelFeet(now.windWaveHeight)}
           </div>
           <div className="text-[10px] text-slate-500">
-            {now.windWavePeriod.toFixed(0)}s {degreesToCardinal(now.windWaveDirection)}
+            {isUnavailableZero(now.windWaveHeight)
+              ? MISSING_DISPLAY
+              : `${(now.windWavePeriod ?? 0).toFixed(0)}s ${degreesToCardinal(now.windWaveDirection ?? 0)}`}
           </div>
         </div>
 
@@ -51,10 +60,12 @@ export default function MarineConditions({ marine }: Props) {
         <div className="bg-ocean-800/60 rounded-lg p-2.5 border border-ocean-700/50">
           <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Swell</div>
           <div className="text-sm font-semibold text-slate-200 font-mono">
-            {now.swellHeight.toFixed(1)} ft
+            {formatModelFeet(now.swellHeight)}
           </div>
           <div className="text-[10px] text-slate-500">
-            {now.swellPeriod.toFixed(0)}s {degreesToCardinal(now.swellDirection)}
+            {isUnavailableZero(now.swellHeight)
+              ? MISSING_DISPLAY
+              : `${now.swellPeriod.toFixed(0)}s ${degreesToCardinal(now.swellDirection ?? 0)}`}
           </div>
         </div>
 
@@ -62,10 +73,12 @@ export default function MarineConditions({ marine }: Props) {
         <div className="bg-ocean-800/60 rounded-lg p-2.5 border border-ocean-700/50">
           <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Current</div>
           <div className="text-sm font-semibold text-slate-200 font-mono">
-            {now.oceanCurrentSpeed.toFixed(1)} kt
+            {formatModelCurrentKt(now.oceanCurrentSpeed)}
           </div>
           <div className="text-[10px] text-slate-500">
-            toward {degreesToCardinal(now.oceanCurrentDirection)}
+            {isUnavailableZero(now.oceanCurrentSpeed)
+              ? MISSING_DISPLAY
+              : `toward ${degreesToCardinal(now.oceanCurrentDirection ?? 0)}`}
           </div>
         </div>
 
@@ -73,7 +86,7 @@ export default function MarineConditions({ marine }: Props) {
         <div className="bg-ocean-800/60 rounded-lg p-2.5 border border-ocean-700/50">
           <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Model water temp</div>
           <div className="text-sm font-semibold text-slate-200 font-mono">
-            {Math.round(now.seaSurfaceTemp)}°F
+            {formatModelTempF(now.seaSurfaceTemp)}
           </div>
         </div>
       </div>
@@ -120,15 +133,19 @@ export default function MarineConditions({ marine }: Props) {
                   </div>
                   <span className="text-[9px] text-slate-500">{h.wavePeriod.toFixed(0)}s</span>
 
-                  {/* Swell arrow */}
-                  <svg
-                    width="10" height="10" viewBox="0 0 10 10"
-                    style={{ transform: `rotate(${h.swellDirection + 180}deg)` }}
-                  >
-                    <polygon points="5,0 3,8 5,6 7,8" fill="#06b6d4" />
-                  </svg>
+                  {/* Swell arrow — hide when swell is unavailable */}
+                  {h.swellDirection == null ? (
+                    <span className="text-[10px] text-slate-600">{MISSING_DISPLAY}</span>
+                  ) : (
+                    <svg
+                      width="10" height="10" viewBox="0 0 10 10"
+                      style={{ transform: `rotate(${h.swellDirection + 180}deg)` }}
+                    >
+                      <polygon points="5,0 3,8 5,6 7,8" fill="#06b6d4" />
+                    </svg>
+                  )}
                   <span className="text-[10px] text-slate-400 font-mono">
-                    {h.swellHeight.toFixed(1)}
+                    {isUnavailableZero(h.swellHeight) ? MISSING_DISPLAY : h.swellHeight!.toFixed(1)}
                   </span>
                 </div>
               )
