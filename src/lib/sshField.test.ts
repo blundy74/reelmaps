@@ -2,7 +2,7 @@
  * SSH look lock + ERDDAP parse.
  * Run: npx --yes tsx src/lib/sshField.test.ts
  */
-import { parseErddapSla, sshAgeStamp, SSH_GIBS_TIME } from './sshField'
+import { parseErddapCsv, parseErddapSla, sshAgeStamp, SSH_GIBS_TIME } from './sshField'
 import { isolineSegments, SSH_CONTOUR_LEVELS, SSH_FAT_M, SSH_INTERVAL_M } from './sshContours'
 
 function assert(cond: unknown, msg: string): asserts cond {
@@ -52,6 +52,20 @@ function main() {
   assert(parsed!.fieldDate === '2026-03-25', parsed!.fieldDate)
   assert(parsed!.rows === 3 && parsed!.cols === 3, 'grid shape')
   assert(Math.abs(parsed!.sla[0] - 0.10) < 1e-5, 'north-up first cell')
+
+  const csv = parseErddapCsv(
+    'time,latitude,longitude,sla\nUTC,degrees_north,degrees_east,m\n'
+    + '2026-03-25T00:00:00Z,24.125,-91.875,0.09\n'
+    + '2026-03-25T00:00:00Z,24.125,-91.625,0.11\n'
+    + '2026-03-25T00:00:00Z,24.125,-91.375,0.10\n'
+    + '2026-03-25T00:00:00Z,24.375,-91.875,0.12\n'
+    + '2026-03-25T00:00:00Z,24.375,-91.625,0.22\n'
+    + '2026-03-25T00:00:00Z,24.375,-91.375,0.13\n'
+    + '2026-03-25T00:00:00Z,24.625,-91.875,0.10\n'
+    + '2026-03-25T00:00:00Z,24.625,-91.625,0.14\n'
+    + '2026-03-25T00:00:00Z,24.625,-91.375,0.11\n',
+  )
+  assert(csv != null && csv.fieldDate === '2026-03-25', 'csv parse')
 
   console.log('sshField.test.ts: ok')
 }

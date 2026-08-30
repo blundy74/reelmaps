@@ -78,6 +78,7 @@ export default function SshContourOverlay({ mapRef, mapReady, visible, opacity }
     const existing = gridRef.current
     if (
       existing
+      && existing.source === 'erddap'
       && Date.now() - existing.fetchedAt < DATA_TTL_MS
       && sshGridCovers(existing, south, north, west, east)
     ) {

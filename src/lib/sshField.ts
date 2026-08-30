@@ -11,7 +11,7 @@ import { humanIsoDate } from './utils'
 const ERDDAP_DATASET = 'nesdisSSH1day'
 const ERDDAP_DIRECT = 'https://coastwatch.pfeg.noaa.gov/erddap'
 const ERDDAP_PROXY = '/proxy/erddap'
-const ERDDAP_TIMEOUT_MS = 8000
+const ERDDAP_TIMEOUT_MS = 12_000
 const NATIVE_DEG = 0.25
 
 const GIBS_WMS = 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi'
@@ -75,13 +75,13 @@ function strideFor(south: number, north: number, west: number, east: number): nu
   const cells = (stride: number) =>
     (Math.ceil((north - south) / (NATIVE_DEG * stride)) + 1)
     * (Math.ceil((east - west) / (NATIVE_DEG * stride)) + 1)
-  while (cells(s) > 14_000 && s < 16) s *= 2
+  while (cells(s) > 4_000 && s < 16) s *= 2
   return s
 }
 
 function erddapQueryUrl(root: string, south: number, north: number, west: number, east: number, stride: number): string {
   const q = `sla[(last)][(${south.toFixed(3)}):${stride}:(${north.toFixed(3)})][(${west.toFixed(3)}):${stride}:(${east.toFixed(3)})]`
-  return `${root}/griddap/${ERDDAP_DATASET}.json?${q}`
+  return `${root}/griddap/${ERDDAP_DATASET}.csv?${q}`
 }
 
 interface ErddapTable {
@@ -89,6 +89,23 @@ interface ErddapTable {
     columnNames?: string[]
     rows?: Array<[string, number, number, number | null]>
   }
+}
+
+export function parseErddapCsv(text: string): SshGrid | null {
+  const lines = text.split(/\r?\n/)
+  const rows: Array<[string, number, number, number | null]> = []
+  for (const line of lines) {
+    if (!line || /^(time|UTC)/i.test(line)) continue
+    const parts = line.split(',')
+    if (parts.length < 4) continue
+    const lat = Number(parts[1])
+    const lon = Number(parts[2])
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+    const raw = parts[3].trim()
+    const sla = raw === '' || raw === 'NaN' ? null : Number(raw)
+    rows.push([parts[0], lat, lon, sla != null && Number.isFinite(sla) ? sla : null])
+  }
+  return parseErddapSla({ table: { rows } })
 }
 
 export function parseErddapSla(json: ErddapTable): SshGrid | null {
@@ -144,8 +161,8 @@ async function fetchErddap(
     try {
       const res = await fetch(url, { signal: ctrl.signal })
       if (!res.ok) continue
-      const json = (await res.json()) as ErddapTable
-      const grid = parseErddapSla(json)
+      const text = await res.text()
+      const grid = parseErddapCsv(text)
       if (grid) return grid
     } catch {
       /* try next root or fall through */
