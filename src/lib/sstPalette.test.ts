@@ -64,7 +64,7 @@ function main() {
   assert(pack(fishingBandColor(87, gomPaint.minF, gomPaint.maxF)) !== pack(fishingBandColor(88, gomPaint.minF, gomPaint.maxF)), 'paint 87 vs 88')
 
   const url = applySstScaleUrl('https://gibs.earthdata.nasa.gov/wms/x', 78, 90)
-  assert(url.startsWith('sstscale://78,90,v17/'), `band token ${url}`)
+  assert(url.startsWith('sstscale://78,90,v18/'), `band token ${url}`)
   const parsed = parseSstScaleUrl(url)
   assert(parsed != null && parsed.minF === 78 && parsed.maxF === 90, 'parse band url')
   assert(parsed!.httpsUrl.startsWith('https://'), 'https restored')

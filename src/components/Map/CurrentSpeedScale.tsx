@@ -17,7 +17,8 @@ const GRADIENT =
 
 export default function CurrentSpeedScale({ visible }: { visible: boolean }) {
   const cursor = useMapStore((s) => s.cursorCoords)
-  if (!visible) return null
+  const currentsZoomHint = useMapStore((s) => s.currentsZoomHint)
+  if (!visible || currentsZoomHint) return null
 
   const sample = cursor && latestOscarGrid()
     ? sampleOscar(latestOscarGrid()!, cursor.lat, cursor.lng)

@@ -20,7 +20,7 @@ export const SST_GOM_PAINT_MAX_F = 90
 export const SST_WIDE_MIN_F = 50
 export const SST_WIDE_MAX_F = 90
 /** Cache-bust token so MapLibre rebuilds rematched tiles after palette changes. */
-export const SST_SCALE_TOKEN = 'v17'
+export const SST_SCALE_TOKEN = 'v18'
 /** Minimum fishing window — tight enough that 1°F Gulf structure still paints. */
 export const SST_MIN_SPAN_F = 1.5
 /** Cap so a mixed-basin view cannot crush the Gulf to one red. */

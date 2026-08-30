@@ -162,6 +162,9 @@ interface MapState {
     pending: boolean
   } | null
 
+  /** True when Current Arrows is on but no flowing shafts are drawn. */
+  currentsZoomHint: boolean
+
   // Actions
   setViewState: (vs: Partial<MapState['viewState']>) => void
   setLayerLoading: (id: string, loading: boolean) => void
@@ -170,6 +173,7 @@ interface MapState {
   setHotspotEmpty: (empty: boolean) => void
   setSearchLabel: (label: string) => void
   setSstReadout: (readout: MapState['sstReadout']) => void
+  setCurrentsZoomHint: (hint: boolean) => void
   toggleLayer: (id: string) => void
   setLayerVisible: (id: string, visible: boolean) => void
   selectImagery: (id: string) => void
@@ -227,6 +231,7 @@ export const useMapStore = create<MapState>()(
       hotspotEmpty: false,
       searchLabel: '',
       sstReadout: null,
+      currentsZoomHint: false,
 
       setViewState: (vs) =>
         set((state) => ({ viewState: { ...state.viewState, ...vs } })),
@@ -235,6 +240,8 @@ export const useMapStore = create<MapState>()(
       setHotspotEmpty: (empty) => set({ hotspotEmpty: empty }),
       setSearchLabel: (label) => set({ searchLabel: label }),
       setSstReadout: (readout) => set({ sstReadout: readout }),
+      setCurrentsZoomHint: (hint) =>
+        set((state) => (state.currentsZoomHint === hint ? state : { currentsZoomHint: hint })),
 
       setLayerLoading: (id, loading) =>
         set((state) => {
